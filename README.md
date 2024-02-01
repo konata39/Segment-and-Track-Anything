@@ -28,4 +28,3 @@ cd - \
 \
 #Install ckpt\
 sh ./script/download_ckpt.sh\
-..
