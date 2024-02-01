@@ -97,9 +97,9 @@ def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame
     }
 
     if input_video is not None:
-        return video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num, delete_dir=delete_dir)
+        return video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num, delete_dir=True)
     elif input_img_seq is not None:
-        return img_seq_type_input_tracking(SegTracker, io_args, video_name, imgs_path, fps, frame_num, delete_dir=delete_dir)
+        return img_seq_type_input_tracking(SegTracker, io_args, video_name, imgs_path, fps, frame_num, delete_dir=True)
 
 
 def video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num=0, delete_dir=True):
@@ -265,11 +265,13 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     # print("{} saved".format(io_args['output_gif']))
 
     # zip predicted mask
-    print("Prepare to die...")
+    #print("Prepare to die...")
     if os.name == 'posix':
-        os.system(f"zip -r {io_args['tracking_result_dir']}/{video_name}_pred_mask.zip {io_args['output_mask_dir']}")
+        print(f"start zipping... zip -r {io_args['tracking_result_dir']}/{video_name}_pred_mask.zip {io_args['tracking_result_dir']}")
+        os.system(f"zip -r {io_args['tracking_result_dir']}/{video_name}_pred_mask.zip {io_args['tracking_result_dir']}")
     elif os.name == "nt":
-        os.system(f"7z a -tzip {io_args['tracking_result_dir']}/{video_name}_pred_mask.zip {io_args['output_mask_dir']}")
+        print(f"start zipping... 7z a -tzip {io_args['tracking_result_dir']}/{video_name}_pred_mask.zip {io_args['tracking_result_dir']}")
+        os.system(f"7z a -tzip {io_args['tracking_result_dir']}/{video_name}_pred_mask.zip {io_args['tracking_result_dir']}")
     # manually release memory (after cuda out of memory)
     del SegTracker
     torch.cuda.empty_cache()
