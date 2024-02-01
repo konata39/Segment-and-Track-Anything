@@ -27,4 +27,4 @@ pip install -e . \
 cd - \
 \
 #Install ckpt\
-sh ./script/download_ckpt.sh\
+sh ./script/download_ckpt.sh
