@@ -30,4 +30,4 @@ cd - \
 sh ./script/download_ckpt.sh
 
 ## 使用說明
-[[https://hackmd.io/JZ1XJforSV-nOLlnrhVesQ](https://hackmd.io/9osxi6z-THiEexabUZHVMQ)](https://hackmd.io/9osxi6z-THiEexabUZHVMQ)https://hackmd.io/9osxi6z-THiEexabUZHVMQ
+(https://hackmd.io/9osxi6z-THiEexabUZHVMQ)https://hackmd.io/9osxi6z-THiEexabUZHVMQ
