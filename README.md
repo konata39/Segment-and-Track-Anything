@@ -28,3 +28,6 @@ cd - \
 \
 #Install ckpt\
 sh ./script/download_ckpt.sh
+
+## 使用說明
+https://hackmd.io/JZ1XJforSV-nOLlnrhVesQ
