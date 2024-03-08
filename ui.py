@@ -80,8 +80,8 @@ class DataLabelingApp:
         self.master.bind("<Configure>", self.on_window_resize)
 
         # Labeling buttons
-        self.undo_button = tk.Button(self.control_frame, text="Undo", command=self.undo_label)
-        self.undo_button.pack(side=tk.LEFT)
+        self.reset_button = tk.Button(self.control_frame, text="Reset", command=self.reset_label)
+        self.reset_button.pack(side=tk.LEFT)
 
         self.labels_history = []  # To store the history of label operations
         self.json_data = None  # To store json
@@ -111,14 +111,17 @@ class DataLabelingApp:
         self.load_json_button = tk.Button(self.control_frame, text="Load JSON", command=self.load_json_data)
         self.load_json_button.pack(side=tk.LEFT)
 
-        self.train_labels_button = tk.Button(self.control_frame, text="Train Video", command=self.train_labels)
-        self.train_labels_button.pack(side=tk.LEFT)
+        self.track_labels_button = tk.Button(self.control_frame, text="Track Video", command=self.track_labels)
+        self.track_labels_button.pack(side=tk.LEFT)
 
         self.find_small_mask_button = tk.Button(self.control_frame, text="Find next abnormal small frame", command=self.find_and_jump_to_small_mask)
         self.find_small_mask_button.pack(side=tk.LEFT)
 
         self.find_large_range_button = tk.Button(self.control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
         self.find_large_range_button.pack(side=tk.LEFT)
+
+        self.capture_first_frame_button = tk.Button(self.control_frame, text="Capture First Frame", command=self.capture_first_frame)
+        self.capture_first_frame_button.pack(side=tk.LEFT)
 
     def SegTracker_add_first_frame(self, Seg_Tracker, origin_frame, predicted_mask):
         with torch.cuda.amp.autocast():
@@ -162,6 +165,8 @@ class DataLabelingApp:
         self.video_path = file_path
         if file_path:
             self.cap = cv2.VideoCapture(file_path)
+            self.width  = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             self.video_fps = self.cap.get(cv2.CAP_PROP_FPS)
             total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.video_scroll.config(to=total_frames - 1)
@@ -201,6 +206,7 @@ class DataLabelingApp:
 
     def capture_frame(self):
         if self.current_frame is not None:
+            self.labels_history = []
             self.Seg_Tracker.restart_tracker()
             self.captured_frame = self.current_frame.copy()
             self.masked_frame = self.current_frame.copy()
@@ -268,31 +274,24 @@ class DataLabelingApp:
             self.labels_history.append(label_info)
             print(self.labels_history)
 
-    def undo_label(self):
-        now_click_stack = self.click_stack[int(self.current_label_code.get())]
-        if len(now_click_stack[0]) > 0:
-            now_click_stack[0] = now_click_stack[0][: -1]
-            now_click_stack[1] = now_click_stack[1][: -1]
+    def reset_label(self):
+        #now_click_stack = self.click_stack[int(self.current_label_code.get())]
+        #now_click_stack[0] = [[]]
+        #now_click_stack[1] = []
+        #self.labels_history = []
 
-        if len(now_click_stack[0]) > 0:
-            prompt = {
-                "points_coord":now_click_stack[0],
-                "points_mode":now_click_stack[1],
-                "multimask":"True",
-            }
-            masked_frame = self.seg_acc_click(self.Seg_Tracker, prompt, self.captured_frame)
-            self.display_frame_in_canvas(masked_frame, self.image_canvas)
-        else:
-            masked_frame = self.captured_frame
-            self.display_frame_in_canvas(masked_frame, self.image_canvas)
+        #prompt = {
+        #    "points_coord":now_click_stack[0],
+        #    "points_mode":now_click_stack[1],
+        #    "multimask":"True",
+        #}
+        #masked_frame = self.seg_acc_click(self.Seg_Tracker, prompt, self.captured_frame)
+        #self.display_frame_in_canvas(masked_frame, self.image_canvas)
+        self.click_stack = self.click_stack = [[[],[]],[[],[]],[[],[]],[[],[]],[[],[]],[[],[]]]
+        self.labels_history = []
+        self.Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
+        self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
 
-        if self.labels_history:
-            label_index = self.current_label_code.get()
-            for i in range(len(self.labels_history) - 1, -1, -1):
-                if self.labels_history[i][2] == label_index:
-                    last_label_id, _, _ = self.labels_history.pop(i)  # Correctly unpack the tuple
-                    self.image_canvas.delete(last_label_id)
-                    break
 
     def display_frame_in_canvas(self, frame, canvas):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -377,9 +376,10 @@ class DataLabelingApp:
         self.Seg_Tracker.update_origin_merged_mask(prev_mask)
         self.Seg_Tracker.curr_idx = int(self.current_label_code.get())
 
-    def train_labels(self):
+    def track_labels(self):
         if self.video_path is not None:
-            tracking_objects_in_video(self.Seg_Tracker, self.video_path, None, self.video_fps, int(self.current_label_code.get()))
+            print(int(self.video_scroll.get()))
+            tracking_objects_in_video(self.Seg_Tracker, self.video_path, None, self.video_fps, int(self.video_scroll.get()), False, False)
 
     def find_and_jump_to_small_mask(self):
         if self.json_data is None:
@@ -449,6 +449,16 @@ class DataLabelingApp:
                     self.current_frame_in_canvas = frame
                     self.display_frame_in_canvas(frame, self.video_canvas)
                     return
+
+    def capture_first_frame(self):
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        ret, frame = self.cap.read()
+        if frame is not None:
+            self.Seg_Tracker.restart_tracker()
+            self.labels_history = []
+            self.captured_frame = frame.copy()
+            self.masked_frame = frame.copy()
+            self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
 
     #for frame_index, mask_data in self.json_data.items():
     #    for _, mask in mask_data['shapes'].items():
