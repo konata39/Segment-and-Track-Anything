@@ -1,9 +1,7 @@
 .vscode
 ckpt/*
-assets/*masks
-assets/*mp4
+assets/*
 # assets/*zip
-assets/*gif
 *.pyc
 debug
 cym_utils
