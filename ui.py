@@ -272,7 +272,6 @@ class DataLabelingApp:
             oval_id = self.image_canvas.create_oval(x - 1, y - 1, x + 1, y + 1, fill=color, outline=color)
             label_info = (oval_id, self.label_mode, self.current_label_code.get())  # Include the selected label code
             self.labels_history.append(label_info)
-            print(self.labels_history)
 
     def reset_label(self):
         #now_click_stack = self.click_stack[int(self.current_label_code.get())]
@@ -287,10 +286,22 @@ class DataLabelingApp:
         #}
         #masked_frame = self.seg_acc_click(self.Seg_Tracker, prompt, self.captured_frame)
         #self.display_frame_in_canvas(masked_frame, self.image_canvas)
-        self.click_stack = self.click_stack = [[[],[]],[[],[]],[[],[]],[[],[]],[[],[]],[[],[]]]
+        now_index = int(self.current_label_code.get())
+        self.click_stack[now_index] = [[],[]]
         self.labels_history = []
+        self.masked_frame = self.captured_frame
         self.Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
-        self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
+        for i in range(6):
+            if len(self.click_stack[i][0]) != 0:
+                 self.Seg_Tracker.curr_idx = i
+                 prompt = {
+                     "points_coord":self.click_stack[i][0],
+                     "points_mode":self.click_stack[i][1],
+                     "multimask":"True",
+                 }
+                 self.masked_frame = self.seg_acc_click(self.Seg_Tracker, prompt, self.masked_frame)
+        #self.Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
+        self.display_frame_in_canvas(self.masked_frame, self.image_canvas)
 
 
     def display_frame_in_canvas(self, frame, canvas):
