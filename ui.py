@@ -453,11 +453,21 @@ class DataLabelingApp:
     def capture_first_frame(self):
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
         ret, frame = self.cap.read()
+        self.video_scroll.set(0)
         if frame is not None:
+            self.current_frame = frame
+            self.current_frame_in_canvas = frame
             self.Seg_Tracker.restart_tracker()
             self.labels_history = []
             self.captured_frame = frame.copy()
             self.masked_frame = frame.copy()
+            if self.json_data:
+                index = int(self.video_scroll.get())
+                if index < len(self.json_data['color_dict']):
+                    mask = self.rebuild_mask_from_index(0)
+                    self.current_mask = mask
+                    frame = self.apply_mask_to_frame(frame, mask)
+                    self.current_frame_in_canvas = frame
             self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
 
     #for frame_index, mask_data in self.json_data.items():
