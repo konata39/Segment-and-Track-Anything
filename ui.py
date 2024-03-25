@@ -149,8 +149,7 @@ class DataLabelingApp:
     def get_click_prompt(self, click_stack, point):
 
         click_stack[0].append(point["coord"])
-        click_stack[1].append(point["mode"]
-        )
+        click_stack[1].append(point["mode"])
 
         prompt = {
             "points_coord":click_stack[0],
@@ -262,7 +261,8 @@ class DataLabelingApp:
                 point = {"coord": [acc_x, acc_y], "mode": 0}
 
             # get click prompts for sam to predict mask
-            click_prompt = self.get_click_prompt(self.click_stack[int(self.current_label_code.get())], point)
+            click_prompt = self.get_click_prompt(self.click_stack[int(self.current_label_code.get())-1], point)
+            print(self.click_stack)
             masked_frame = self.seg_acc_click(self.Seg_Tracker, click_prompt, self.captured_frame)
             self.masked_frame = masked_frame
             self.display_frame_in_canvas(masked_frame, self.image_canvas)
@@ -287,19 +287,22 @@ class DataLabelingApp:
         #masked_frame = self.seg_acc_click(self.Seg_Tracker, prompt, self.captured_frame)
         #self.display_frame_in_canvas(masked_frame, self.image_canvas)
         now_index = int(self.current_label_code.get())
-        self.click_stack[now_index] = [[],[]]
+        self.click_stack[now_index-1] = [[],[]]
         self.labels_history = []
         self.masked_frame = self.captured_frame
         self.Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
         for i in range(6):
             if len(self.click_stack[i][0]) != 0:
-                 self.Seg_Tracker.curr_idx = i
+                 self.Seg_Tracker.curr_idx = i+1
                  prompt = {
-                     "points_coord":self.click_stack[i][0],
-                     "points_mode":self.click_stack[i][1],
+                     "points_coord":self.click_stack[i-1][0],
+                     "points_mode":self.click_stack[i-1][1],
                      "multimask":"True",
                  }
                  self.masked_frame = self.seg_acc_click(self.Seg_Tracker, prompt, self.masked_frame)
+        prev_mask = self.Seg_Tracker.first_frame_mask
+        self.Seg_Tracker.update_origin_merged_mask(prev_mask)
+        self.Seg_Tracker.curr_idx = now_index
         #self.Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
         self.display_frame_in_canvas(self.masked_frame, self.image_canvas)
 
@@ -383,9 +386,37 @@ class DataLabelingApp:
                     self.current_label_code.set(str(label))
 
     def label_change(self, *args):
-        prev_mask = self.Seg_Tracker.first_frame_mask
-        self.Seg_Tracker.update_origin_merged_mask(prev_mask)
-        self.Seg_Tracker.curr_idx = int(self.current_label_code.get())
+        #prev_mask = self.Seg_Tracker.first_frame_mask
+        #self.Seg_Tracker.update_origin_merged_mask(prev_mask)
+        #self.Seg_Tracker.restart_tracker()
+        now_index = int(self.current_label_code.get())
+        for i in range(6):
+            self.Seg_Tracker.reset_origin_merged_mask(None, i)
+        self.Seg_Tracker.update_origin_merged_mask(None)
+        #self.masked_frame = self.captured_frame
+
+        for i in range(6):
+            self.Seg_Tracker.curr_idx = i+1
+            if i+1 != now_index and len(self.click_stack[i][0]) != 0:
+                 prompt = {
+                     "points_coord":self.click_stack[i][0],
+                     "points_mode":self.click_stack[i][1],
+                     "multimask":"True",
+                 }
+                 self.masked_frame = self.seg_acc_click(self.Seg_Tracker, prompt, self.masked_frame)
+                 prev_mask = self.Seg_Tracker.first_frame_mask
+                 self.Seg_Tracker.update_origin_merged_mask(prev_mask)
+        self.Seg_Tracker.curr_idx = now_index
+        masked_frame = self.masked_frame
+        if len(self.click_stack[self.Seg_Tracker.curr_idx-1][0]) != 0:
+             prompt = {
+                 "points_coord":self.click_stack[self.Seg_Tracker.curr_idx-1][0],
+                 "points_mode":self.click_stack[self.Seg_Tracker.curr_idx-1][1],
+                 "multimask":"True",
+             }
+             masked_frame = self.seg_acc_click(self.Seg_Tracker, prompt, self.masked_frame)
+        #self.Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
+        self.display_frame_in_canvas(masked_frame, self.image_canvas)
 
     def track_labels(self):
         if self.video_path is not None:
