@@ -9,6 +9,10 @@ from model_args import segtracker_args,sam_args,aot_args
 from SegTracker import SegTracker
 from tool.transfer_tools import draw_outline, draw_points
 import torch
+import threading
+
+def thread_tracking(Seg_Tracker, video_path, video_fps, iframe):
+    tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, False, False)
 
 class DataLabelingApp:
     def __init__(self, master):
@@ -75,7 +79,8 @@ class DataLabelingApp:
         self.masked_frame = None
         self.video_path = None
         self.video_fps = 0
-
+        self.thread_video = None
+        self.stop_event = threading.Event()
         # Bind the resize event
         self.master.bind("<Configure>", self.on_window_resize)
 
@@ -236,6 +241,7 @@ class DataLabelingApp:
 
     def mark_label(self, event):
         if self.label_mode and self.captured_frame is not None:
+            self.Seg_Tracker.curr_idx = int(self.current_label_code.get())
             x, y = event.x, event.y
             canvas_width = self.image_canvas.winfo_width()
             canvas_height = self.image_canvas.winfo_height()
@@ -263,6 +269,7 @@ class DataLabelingApp:
             # get click prompts for sam to predict mask
             click_prompt = self.get_click_prompt(self.click_stack[int(self.current_label_code.get())-1], point)
             print(self.click_stack)
+            print(self.Seg_Tracker.curr_idx)
             masked_frame = self.seg_acc_click(self.Seg_Tracker, click_prompt, self.captured_frame)
             self.masked_frame = masked_frame
             self.display_frame_in_canvas(masked_frame, self.image_canvas)
@@ -421,7 +428,9 @@ class DataLabelingApp:
     def track_labels(self):
         if self.video_path is not None:
             print(int(self.video_scroll.get()))
-            tracking_objects_in_video(self.Seg_Tracker, self.video_path, None, self.video_fps, int(self.video_scroll.get()), False, False)
+            self.stop_event.clear()
+            self.thread_video = threading.Thread(target=thread_tracking, args=(self.Seg_Tracker, self.video_path, self.video_fps, int(self.video_scroll.get())))
+            self.thread_video.start()
 
     def find_and_jump_to_small_mask(self):
         if self.json_data is None:
@@ -511,7 +520,6 @@ class DataLabelingApp:
                     frame = self.apply_mask_to_frame(frame, mask)
                     self.current_frame_in_canvas = frame
             self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
-
     #for frame_index, mask_data in self.json_data.items():
     #    for _, mask in mask_data['shapes'].items():
     #        area = self.calculate_mask_area(mask)
@@ -523,8 +531,8 @@ class DataLabelingApp:
     #    self.jump_to_frame(earliest_frame)
     #else:
     #    print("None")
-
-root = tk.Tk()
-root.geometry("1280x720")  # Initial size of the window
-app = DataLabelingApp(root)
-root.mainloop()
+if __name__ == '__main__':
+    root = tk.Tk()
+    root.geometry("1280x720")  # Initial size of the window
+    app = DataLabelingApp(root)
+    root.mainloop()
