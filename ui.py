@@ -10,14 +10,74 @@ from SegTracker import SegTracker
 from tool.transfer_tools import draw_outline, draw_points
 import torch
 import threading
+from scipy.ndimage import binary_dilation
+from scipy.spatial.distance import cdist
 
-def thread_tracking(Seg_Tracker, video_path, video_fps, iframe):
-    tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, False, False)
+def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check):
+    tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, False, False, detect_check)
+
+def chack_group_distance(mask):
+    rows, cols = mask.shape
+    group_id = 1
+    groups = np.zeros_like(mask)
+    group_counts = {}
+    adjacent = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]  # 8方向鄰居
+    def dfs_iterative(x, y, value):
+        stack = [(x, y)]
+        while stack:
+            x, y = stack.pop()
+            if x < 0 or x >= rows or y < 0 or y >= cols or mask[x, y] != value or groups[x, y] != 0:
+                continue
+            groups[x, y] = group_id
+            group_counts[group_id] += 1
+            for dx, dy in adjacent:
+                stack.append((x + dx, y + dy))
+
+    for i in range(rows):
+        for j in range(cols):
+            if mask[i, j] != 0 and groups[i, j] == 0:
+                group_counts[group_id] = 0
+                dfs_iterative(i, j, mask[i, j])
+                group_id += 1
+
+    value_groups = {}
+    for gid, count in group_counts.items():
+        value = mask[groups == gid][0]
+        if value not in value_groups:
+            value_groups[value] = []
+        value_groups[value].append(gid)
+
+    disconnected_pairs = []
+    distances = {}
+
+    for value, gids in value_groups.items():
+        if len(gids) > 1:
+            for i in range(len(gids) - 1):
+                for j in range(i + 1, len(gids)):
+                    group_i_points = np.argwhere(groups == gids[i])
+                    group_j_points = np.argwhere(groups == gids[j])
+                    max_distance = np.min(cdist(group_i_points, group_j_points, 'euclidean'))
+                    if value not in distances:
+                        distances[value] = -2147483647
+                    if max_distance > distances[value]:
+                        distances[value] = max_distance
+                    disconnected_pairs.append((gids[i], gids[j]))
+
+    group_centers = {}
+
+    for gid in value_groups.items():
+        group_points = np.argwhere(mask == gid[0])
+        group_points = tuple(tuple(sub) for sub in group_points)
+        center_x, center_y = np.mean(group_points, axis=0)
+        group_centers[gid[0]] = (center_x, center_y)
+    return distances, group_centers
 
 class DataLabelingApp:
     def __init__(self, master):
         self.master = master
         master.title("Data Labeling Tool")
+
+        self.current_frame_num = tk.IntVar(value=0)
 
         # Frame for video and image display areas
         self.display_frame = tk.Frame(master)
@@ -56,6 +116,15 @@ class DataLabelingApp:
         # Scroll bar for video navigation
         self.video_scroll = tk.Scale(self.control_frame, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_video_frame)
         self.video_scroll.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.master.bind("<Left>", self.prev_frame)
+        self.master.bind("<Right>", self.next_frame)
+
+        vcmd = (self.master.register(self.validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
+        self.entry = tk.Entry(self.control_frame, textvariable=self.current_frame_num, validate = 'key', validatecommand = vcmd)
+        self.entry.pack(side=tk.LEFT)
+
+        self.jump_button = tk.Button(self.control_frame, text="Jump to frame", command=self.jump_to_frame)
+        self.jump_button.pack(side=tk.LEFT)
 
         # Button to capture current frame to mark
         self.capture_frame_button = tk.Button(self.control_frame, text="Capture Frame", command=self.capture_frame)
@@ -80,6 +149,8 @@ class DataLabelingApp:
         self.video_path = None
         self.video_fps = 0
         self.thread_video = None
+        self.abnormal_list = []
+        self.idx = 0
         self.stop_event = threading.Event()
         # Bind the resize event
         self.master.bind("<Configure>", self.on_window_resize)
@@ -119,14 +190,37 @@ class DataLabelingApp:
         self.track_labels_button = tk.Button(self.control_frame, text="Track Video", command=self.track_labels)
         self.track_labels_button.pack(side=tk.LEFT)
 
-        self.find_small_mask_button = tk.Button(self.control_frame, text="Find next abnormal small frame", command=self.find_and_jump_to_small_mask)
-        self.find_small_mask_button.pack(side=tk.LEFT)
+        self.find_previous_abnormal_button = tk.Button(self.control_frame, text="Find previous abnormal frame", command=self.find_previous_abnormal)
+        self.find_previous_abnormal_button.pack(side=tk.LEFT)
 
-        self.find_large_range_button = tk.Button(self.control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
-        self.find_large_range_button.pack(side=tk.LEFT)
+        self.find_next_abnormal_button = tk.Button(self.control_frame, text="Find next abnormal frame", command=self.find_next_abnormal)
+        self.find_next_abnormal_button.pack(side=tk.LEFT)
+
+        self.find_all_abnormal_button = tk.Button(self.control_frame, text="Find all abnormal frame", command=self.find_all_abnormal)
+        self.find_all_abnormal_button.pack(side=tk.LEFT)
+
+        #self.find_large_range_button = tk.Button(self.control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
+        #self.find_large_range_button.pack(side=tk.LEFT)
 
         self.capture_first_frame_button = tk.Button(self.control_frame, text="Capture First Frame", command=self.capture_first_frame)
         self.capture_first_frame_button.pack(side=tk.LEFT)
+
+        self.ab_check = tk.IntVar()
+        self.c1 = tk.Checkbutton(self.control_frame, text='Check abnormal when tracking',variable=self.ab_check, onvalue=True, offvalue=False)
+        self.c1.pack(side=tk.LEFT)
+
+    def validate(self, action, index, value_if_allowed, prior_value, text, validation_type, trigger_type, widget_name):
+        value_if_allowed.replace(" ", "")
+        if value_if_allowed == '':
+            return True
+        if value_if_allowed:
+            try:
+                int(value_if_allowed)
+                return True
+            except ValueError:
+                return False
+        else:
+            return False
 
     def SegTracker_add_first_frame(self, Seg_Tracker, origin_frame, predicted_mask):
         with torch.cuda.amp.autocast():
@@ -178,7 +272,19 @@ class DataLabelingApp:
             self.Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
             self.click_stack = [[[],[]],[[],[]],[[],[]],[[],[]],[[],[]],[[],[]]]
 
+    def jump_to_frame(self):
+        try:
+            frame = int(self.entry.get())
+        except:
+            return
+        frame_count = self.video_scroll.cget("to")
+        if frame > frame_count or frame < 0:
+            return
+        self.video_scroll.set(frame)
+        self.update_video_frame()
+
     def update_video_frame(self, event=None):
+        self.current_frame_num.set(int(self.video_scroll.get()))
         if self.cap:
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, int(self.video_scroll.get()))
             ret, frame = self.cap.read()
@@ -211,7 +317,12 @@ class DataLabelingApp:
     def capture_frame(self):
         if self.current_frame is not None:
             self.labels_history = []
+            self.click_stack = [[[],[]],[[],[]],[[],[]],[[],[]],[[],[]],[[],[]]]
             self.Seg_Tracker.restart_tracker()
+            self.Seg_Tracker.sam.have_embedded = False
+            for i in range(6):
+                self.Seg_Tracker.reset_origin_merged_mask(None, i)
+            self.Seg_Tracker.update_origin_merged_mask(None)
             self.captured_frame = self.current_frame.copy()
             self.masked_frame = self.current_frame.copy()
             self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
@@ -241,6 +352,7 @@ class DataLabelingApp:
 
     def mark_label(self, event):
         if self.label_mode and self.captured_frame is not None:
+
             self.Seg_Tracker.curr_idx = int(self.current_label_code.get())
             x, y = event.x, event.y
             canvas_width = self.image_canvas.winfo_width()
@@ -271,6 +383,7 @@ class DataLabelingApp:
             print(self.click_stack)
             print(self.Seg_Tracker.curr_idx)
             masked_frame = self.seg_acc_click(self.Seg_Tracker, click_prompt, self.captured_frame)
+
             self.masked_frame = masked_frame
             self.display_frame_in_canvas(masked_frame, self.image_canvas)
 
@@ -429,16 +542,34 @@ class DataLabelingApp:
         if self.video_path is not None:
             print(int(self.video_scroll.get()))
             self.stop_event.clear()
-            self.thread_video = threading.Thread(target=thread_tracking, args=(self.Seg_Tracker, self.video_path, self.video_fps, int(self.video_scroll.get())))
+            self.thread_video = threading.Thread(target=thread_tracking, args=(self.Seg_Tracker, self.video_path, self.video_fps, int(self.video_scroll.get()), self.ab_check.get()))
             self.thread_video.start()
 
-    def find_and_jump_to_small_mask(self):
+    def find_previous_abnormal(self):
+        if self.idx == 0:
+            return
+        self.idx -= 1
+        self.video_scroll.set(self.abnormal_list[self.idx])
+        self.update_video_frame()
+
+    def find_next_abnormal(self):
+        if self.idx < len(self.abnormal_list)-1:
+            self.idx += 1
+            self.video_scroll.set(self.abnormal_list[self.idx])
+            self.update_video_frame()
+            return
+
         if self.json_data is None:
             return
         min_area = 50
-        earliest_frame_index = -1
+        prev_center_dict = None
 
         for idx in range(self.video_scroll.get()+1, len(self.json_data['color_dict'])):
+            if len(self.abnormal_list) > 0:
+                if idx < self.abnormal_list[-1] + 20:
+                    continue
+            print("detect frame {}".format(idx),end='\r')
+            #check mask frames
             total_label_count = [0, 0, 0, 0, 0, 0]
             cl = self.json_data['color_dict'][idx]['color_label']
             ct = self.json_data['color_dict'][idx]['color_count']
@@ -446,10 +577,10 @@ class DataLabelingApp:
                 if a == 0:
                     continue
                 total_label_count[a-1] += b
-            print(total_label_count)
             check_min_area = any(x > 0 and x < min_area for x in total_label_count)
+            #print(total_label_count)
             if check_min_area:
-                print(idx)
+                print()
                 self.video_scroll.set(idx)
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
                 ret, frame = self.cap.read()
@@ -458,9 +589,110 @@ class DataLabelingApp:
                 frame = self.apply_mask_to_frame(frame, mask)
                 self.current_frame_in_canvas = frame
                 self.display_frame_in_canvas(frame, self.video_canvas)
+                print("found abnormal min area")
+                self.abnormal_list.append(idx)
+                self.idx = len(self.abnormal_list) - 1
                 break
 
+            #check mask distance
+            now_mask = self.rebuild_mask_from_index(idx)
+            distance_dict, centers_dict = chack_group_distance(now_mask)
+            current_displacements = dict()
+            if prev_center_dict != None:
+                for value, center in centers_dict.items():
+                    if value in prev_center_dict:
+                        displacement = np.sqrt((center[0] - prev_center_dict[value][0])**2 + (center[1] - prev_center_dict[value][1])**2)
+                        current_displacements[value] = displacement
+            dist_threshold_list = [0, 0, 0, 0, 0, 0]
+            for value, dist in distance_dict.items():
+                dist_threshold_list[value-1] = 1 if dist > 250 else 0
+            for value, dist in current_displacements.items():
+                dist_threshold_list[value-1] = 2 if dist > 100 else 0
+            if 1 in dist_threshold_list:
+                print()
+                print("found abnormal apart area")
+                self.abnormal_list.append(idx)
+                self.idx = len(self.abnormal_list) - 1
+                self.video_scroll.set(self.abnormal_list[self.idx])
+                self.update_video_frame()
+                break
+            if 2 in dist_threshold_list:
+                print()
+                print("found abnormal distance")
+                self.abnormal_list.append(idx)
+                self.idx = len(self.abnormal_list) - 1
+                self.video_scroll.set(self.abnormal_list[self.idx])
+                self.update_video_frame()
+                break
+            prev_center_dict = centers_dict
+
+    def find_all_abnormal(self):
+        if self.json_data is None:
+            return
+        min_area = 50
+        prev_center_dict = None
+
+        for idx in range(self.video_scroll.get()+1, len(self.json_data['color_dict'])):
+            if len(self.abnormal_list) > 0:
+                if idx < self.abnormal_list[-1] + 20:
+                    continue
+            print("detect frame {}".format(idx),end='\r')
+            #check mask frames
+            total_label_count = [0, 0, 0, 0, 0, 0]
+            cl = self.json_data['color_dict'][idx]['color_label']
+            ct = self.json_data['color_dict'][idx]['color_count']
+            for a, b in zip(cl, ct):
+                if a == 0:
+                    continue
+                total_label_count[a-1] += b
+            check_min_area = any(x > 0 and x < min_area for x in total_label_count)
+            #print(total_label_count)
+            if check_min_area:
+                print()
+                self.video_scroll.set(idx)
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                ret, frame = self.cap.read()
+                mask = self.rebuild_mask_from_index(idx)
+                self.current_mask = mask
+                frame = self.apply_mask_to_frame(frame, mask)
+                self.current_frame_in_canvas = frame
+                self.display_frame_in_canvas(frame, self.video_canvas)
+                print("found abnormal min area")
+                self.abnormal_list.append(idx)
+                continue
+
+            #check mask distance
+            now_mask = self.rebuild_mask_from_index(idx)
+            distance_dict, centers_dict = chack_group_distance(now_mask)
+            current_displacements = dict()
+            if prev_center_dict != None:
+                for value, center in centers_dict.items():
+                    if value in prev_center_dict:
+                        displacement = np.sqrt((center[0] - prev_center_dict[value][0])**2 + (center[1] - prev_center_dict[value][1])**2)
+                        current_displacements[value] = displacement
+            dist_threshold_list = [0, 0, 0, 0, 0, 0]
+            for value, dist in distance_dict.items():
+                dist_threshold_list[value-1] = 1 if dist > 250 else 0
+            for value, dist in current_displacements.items():
+                dist_threshold_list[value-1] = 2 if dist > 100 else 0
+            if 1 in dist_threshold_list:
+                print()
+                print("found abnormal apart area")
+                self.abnormal_list.append(idx)
+                continue
+            if 2 in dist_threshold_list:
+                print()
+                print("found abnormal distance")
+                self.abnormal_list.append(idx)
+                continue
+            prev_center_dict = centers_dict
+        if len(self.abnormal_list) != 0:
+            self.idx = 0
+            self.video_scroll.set(self.abnormal_list[0])
+            self.update_video_frame()
+
     def find_and_jump_to_large_range(self):
+        #legacy function
         if self.json_data is None:
             return
         max_length = 200
@@ -520,6 +752,23 @@ class DataLabelingApp:
                     frame = self.apply_mask_to_frame(frame, mask)
                     self.current_frame_in_canvas = frame
             self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
+
+    def prev_frame(self, event=None):
+        now_idx = self.video_scroll.get()
+        if now_idx == 0:
+            return
+        now_idx -= 1
+        self.video_scroll.set(now_idx)
+        self.update_video_frame()
+
+    def next_frame(self, event=None):
+        frame_count = self.video_scroll.cget("to")
+        now_idx = self.video_scroll.get()
+        if now_idx == frame_count:
+            return
+        now_idx += 1
+        self.video_scroll.set(now_idx)
+        self.update_video_frame()
     #for frame_index, mask_data in self.json_data.items():
     #    for _, mask in mask_data['shapes'].items():
     #        area = self.calculate_mask_area(mask)

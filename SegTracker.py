@@ -106,7 +106,7 @@ class SegTracker():
         if update_memory:
             self.tracker.update_memory(pred_mask)
         return pred_mask.squeeze(0).squeeze(0).detach().cpu().numpy().astype(np.uint8)
-    
+
     def get_tracking_objs(self):
         objs = set()
         for ref in self.reference_objs_list:
@@ -114,7 +114,7 @@ class SegTracker():
         objs = list(sorted(list(objs)))
         objs = [i for i in objs if i!=0]
         return objs
-    
+
     def get_obj_num(self):
         objs = self.get_tracking_objs()
         if len(objs) == 0: return 0
@@ -144,7 +144,7 @@ class SegTracker():
                 new_obj_mask[new_obj_mask==idx] = obj_num
                 obj_num += 1
         return new_obj_mask
-        
+
     def restart_tracker(self):
         self.tracker.restart()
 
@@ -215,7 +215,7 @@ class SegTracker():
         refined_merged_mask[interactive_mask > 0] = self.curr_idx
 
         return refined_merged_mask
-    
+
     def detect_and_seg(self, origin_frame: np.ndarray, grounding_caption, box_threshold, text_threshold, box_size_threshold=1, reset_image=False):
         '''
         Using Grounding-DINO to detect object acc Text-prompts
@@ -247,9 +247,9 @@ if __name__ == '__main__':
     from model_args import segtracker_args,sam_args,aot_args
 
     Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
-    
+
     # ------------------ detect test ----------------------
-    
+
     origin_frame = cv2.imread('/data2/cym/Seg_Tra_any/Segment-and-Track-Anything/debug/point.png')
     origin_frame = cv2.cvtColor(origin_frame, cv2.COLOR_BGR2RGB)
     grounding_caption = "swan.water"

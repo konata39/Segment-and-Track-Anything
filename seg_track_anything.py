@@ -9,6 +9,7 @@ import torch
 import gc
 import imageio
 from scipy.ndimage import binary_dilation
+from scipy.spatial.distance import cdist
 
 def save_prediction(pred_mask,output_dir,file_name):
     save_mask = Image.fromarray(pred_mask.astype(np.uint8))
@@ -22,6 +23,71 @@ def colorize_mask(pred_mask):
     save_mask.putpalette(_palette)
     save_mask = save_mask.convert(mode='RGB')
     return np.array(save_mask)
+
+def dfs(x, y, value):
+    if x < 0 or x >= rows or y < 0 or y >= cols or mask[x, y] != value or groups[x, y] != 0:
+        return
+    groups[x, y] = group_id
+    group_counts[group_id] += 1
+    for dx, dy in adjacent:
+        dfs(x + dx, y + dy, value)
+
+def chack_group_distance(mask):
+    rows, cols = mask.shape
+    group_id = 1
+    groups = np.zeros_like(mask)
+    group_counts = {}
+    adjacent = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]  # 8方向鄰居
+    def dfs_iterative(x, y, value):
+        stack = [(x, y)]
+        while stack:
+            x, y = stack.pop()
+            if x < 0 or x >= rows or y < 0 or y >= cols or mask[x, y] != value or groups[x, y] != 0:
+                continue
+            groups[x, y] = group_id
+            group_counts[group_id] += 1
+            for dx, dy in adjacent:
+                stack.append((x + dx, y + dy))
+
+    for i in range(rows):
+        for j in range(cols):
+            if mask[i, j] != 0 and groups[i, j] == 0:
+                group_counts[group_id] = 0
+                dfs_iterative(i, j, mask[i, j])
+                group_id += 1
+
+    value_groups = {}
+    for gid, count in group_counts.items():
+        value = mask[groups == gid][0]
+        if value not in value_groups:
+            value_groups[value] = []
+        value_groups[value].append(gid)
+
+    disconnected_pairs = []
+    distances = {}
+
+    for value, gids in value_groups.items():
+        if len(gids) > 1:
+            for i in range(len(gids) - 1):
+                for j in range(i + 1, len(gids)):
+                    group_i_points = np.argwhere(groups == gids[i])
+                    group_j_points = np.argwhere(groups == gids[j])
+                    max_distance = np.min(cdist(group_i_points, group_j_points, 'euclidean'))
+                    if value not in distances:
+                        distances[value] = -2147483647
+                    if max_distance > distances[value]:
+                        distances[value] = max_distance
+                    disconnected_pairs.append((gids[i], gids[j]))
+
+    group_centers = {}
+
+    for gid in value_groups.items():
+        group_points = np.argwhere(mask == gid[0])
+        group_points = tuple(tuple(sub) for sub in group_points)
+        center_x, center_y = np.mean(group_points, axis=0)
+        group_centers[gid[0]] = (center_x, center_y)
+    return distances, group_centers
+
 
 def draw_mask(img, mask, alpha=0.5, id_countour=False):
     img_mask = np.zeros_like(img)
@@ -71,7 +137,7 @@ aot_model2ckpt = {
 }
 
 
-def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame_num=0, delete_dir=True, output_image=True):
+def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame_num=0, delete_dir=True, output_image=True, detect_check=False):
 
     if input_video is not None:
         video_name = os.path.basename(input_video).split('.')[0]
@@ -97,12 +163,12 @@ def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame
     }
 
     if input_video is not None:
-        return video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num, delete_dir=delete_dir, output_image=output_image)
+        return video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num, delete_dir=delete_dir, output_image=output_image, detect_check=detect_check)
     elif input_img_seq is not None:
         return img_seq_type_input_tracking(SegTracker, io_args, video_name, imgs_path, fps, frame_num, delete_dir=delete_dir, output_image=output_image)
 
 
-def video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num=0, delete_dir=True, output_image=True):
+def video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num=0, delete_dir=True, output_image=True, detect_check=False):
 
     pred_list = []
     masked_pred_list = []
@@ -139,7 +205,7 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     gc.collect()
     sam_gap = SegTracker.sam_gap
     frame_idx = 0
-
+    prev_center_dict = None
     with torch.cuda.amp.autocast():
         while cap.isOpened():
             ret, frame  = cap.read()
@@ -173,6 +239,30 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
 
             print("processed frame {}, obj_num {}".format(frame_idx + frame_num, SegTracker.get_obj_num()),end='\r')
             frame_idx += 1
+            if detect_check == True:
+                distance_dict, centers_dict = chack_group_distance(pred_mask)
+                current_displacements = dict()
+                if prev_center_dict != None:
+                    for value, center in centers_dict.items():
+                        if value in prev_center_dict:
+                            displacement = np.sqrt((center[0] - prev_center_dict[value][0])**2 + (center[1] - prev_center_dict[value][1])**2)
+                            current_displacements[value] = displacement
+                dist_threshold_list = [0, 0, 0, 0, 0, 0]
+                for value, dist in distance_dict.items():
+                    dist_threshold_list[value-1] = 1 if dist > 250 else 0
+                for value, dist in current_displacements.items():
+                    dist_threshold_list[value-1] = 2 if dist > 100 else 0
+                if 1 in dist_threshold_list:
+                    print("\nDetect abnomal apart part from Frame {}, stop tracking.".format(frame_idx + frame_num))
+                    #print(centers_dict)
+                    #print(distance_dict)
+                    break
+                if 2 in dist_threshold_list:
+                    print("\nDetect abnomal tracking distance from Frame {}, stop tracking.".format(frame_idx + frame_num))
+                    break
+                prev_center_dict = centers_dict
+
+            #if mask part is separate, break
         cap.release()
         print('\nfinished')
 
@@ -202,11 +292,11 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     part_i = 1
     #io_args['output_video'] = ''.join(name_list)+f'_part_{part_i}.mp4'
     print(f"This is output video {io_args['output_video']}")
-    #out = cv2.VideoWriter(io_args['output_video'], fourcc, fps, (width, height))
+    out = cv2.VideoWriter(io_args['output_video'], fourcc, fps, (width, height))
     #partial video
 
 
-    frame_idx = 0
+    output_frame_idx = 0
     #with open(f"{io_args['output_masked_frame_dir']}/{str(frame_idx).zfill(5)}.json", 'w') as f:
     #    json.dump(data, f)
     color_label = []
@@ -223,10 +313,10 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
         color_label = []
         color_count = []
         frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-        pred_mask = pred_list[frame_idx]
+        pred_mask = pred_list[output_frame_idx]
         masked_frame = draw_mask(frame, pred_mask)
         if output_image:
-            cv2.imwrite(f"{io_args['output_masked_frame_dir']}/{str(frame_idx).zfill(5)}.png", masked_frame[:, :, ::-1])
+            cv2.imwrite(f"{io_args['output_masked_frame_dir']}/{str(output_frame_idx).zfill(5)}.png", masked_frame[:, :, ::-1])
         #print(len(pred_mask))
         #print(len(pred_mask[0]))
         for i in pred_mask:
@@ -243,10 +333,12 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
         color_dict.append({'color_label':color_label, 'color_count':color_count})
         #masked_pred_list.append(masked_frame)
         #masked_frame = cv2.cvtColor(masked_frame,cv2.COLOR_RGB2BGR)
-        #out.write(masked_frame)
+        out.write(masked_frame)
 
-        print('frame {} writed'.format(frame_idx),end='\r')
-        frame_idx += 1
+        print('frame {} writed'.format(output_frame_idx),end='\r')
+        output_frame_idx += 1
+        if output_frame_idx >= frame_idx:
+            break
         #if frame_idx % 900 == 0:
         #    out.release()
         #    part_i += 1
