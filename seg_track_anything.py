@@ -10,6 +10,7 @@ import gc
 import imageio
 from scipy.ndimage import binary_dilation
 from scipy.spatial.distance import cdist
+from itertools import groupby
 
 def save_prediction(pred_mask,output_dir,file_name):
     save_mask = Image.fromarray(pred_mask.astype(np.uint8))
@@ -137,18 +138,18 @@ aot_model2ckpt = {
 }
 
 
-def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame_num=0, delete_dir=True, output_image=True, detect_check=False):
-
+def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame_num=0, end_frame=-1, delete_dir=True, output_image=True, detect_check=False, reversed=False, multi_thread=False, current_label_dict=None):
+    end_frame = int(end_frame)
     if input_video is not None:
-        video_name = os.path.basename(input_video).split('.')[0]
+        video_name = '.'.join(os.path.basename(input_video).split('.')[:-1])
     elif input_img_seq is not None:
-        file_name = input_img_seq.name.split('/')[-1].split('.')[0]
+        file_name = '.'.join(input_img_seq.name.split('/')[-1].split('.')[:-1])
         file_path = f'./assets/{file_name}'
         imgs_path = sorted([os.path.join(file_path, img_name) for img_name in os.listdir(file_path)])
         video_name = file_name
+
     else:
         return None, None
-
     # create dir to save result
     tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
     create_dir(tracking_result_dir)
@@ -156,40 +157,43 @@ def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame
     io_args = {
         'tracking_result_dir': tracking_result_dir,
         'output_mask_dir': f'{tracking_result_dir}/{video_name}_masks',
-        'output_masked_frame_dir': f'{tracking_result_dir}/{video_name}_masked_frames',
-        'output_masked_json_dir': f'{tracking_result_dir}/{video_name}_json_frames',
+        'output_masked_frame_dir': f'{tracking_result_dir}',
+        'output_masked_json_dir': f'{tracking_result_dir}',
         'output_video': f'{tracking_result_dir}/{video_name}_seg.mp4', # keep same format as input video
         'output_gif': f'{tracking_result_dir}/{video_name}_seg.gif',
     }
 
     if input_video is not None:
-        return video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num, delete_dir=delete_dir, output_image=output_image, detect_check=detect_check)
+        return video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num, end_frame, delete_dir=delete_dir, output_image=output_image, detect_check=detect_check, reversed=reversed, multi_thread=multi_thread, current_label_dict=current_label_dict)
     elif input_img_seq is not None:
         return img_seq_type_input_tracking(SegTracker, io_args, video_name, imgs_path, fps, frame_num, delete_dir=delete_dir, output_image=output_image)
 
 
-def video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num=0, delete_dir=True, output_image=True, detect_check=False):
-
+def video_type_input_tracking(SegTracker, input_video, io_args, video_name, frame_num=0, end_frame=-1, delete_dir=True, output_image=True, detect_check=False, reversed=False, multi_thread=False, current_label_dict=None):
+    #print(f"we are start at {frame_num}")
+    #print(f'end_frame is {end_frame}, type is {type(end_frame)}')
     pred_list = []
     masked_pred_list = []
+
 
     # source video to segment
     cap = cv2.VideoCapture(input_video)
     fps = cap.get(cv2.CAP_PROP_FPS)
-
+    if end_frame == -1:
+        end_frame = 0 if reversed else int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if frame_num > 0:
-        output_mask_name = sorted([img_name for img_name in os.listdir(io_args['output_mask_dir'])])
-        output_masked_frame_name = sorted([img_name for img_name in os.listdir(io_args['output_masked_frame_dir'])])
-
-        for i in range(0, frame_num):
-            cap.read()
-            pred_list.append(np.array(Image.open(os.path.join(io_args['output_mask_dir'], output_mask_name[i])).convert('P')))
-            masked_pred_list.append(cv2.imread(os.path.join(io_args['output_masked_frame_dir'], output_masked_frame_name[i])))
+        #output_mask_name = sorted([img_name for img_name in os.listdir(io_args['output_mask_dir'])])
+        #output_masked_frame_name = sorted([img_name for img_name in os.listdir(io_args['output_masked_frame_dir'])])
+        pass
+        #for i in range(0, frame_num):
+        #    cap.read()
+        #    pred_list.append(np.array(Image.open(os.path.join(io_args['output_mask_dir'], output_mask_name[i])).convert('P')))
+        #    masked_pred_list.append(cv2.imread(os.path.join(io_args['output_masked_frame_dir'], output_masked_frame_name[i])))
 
 
     # create dir to save predicted mask and masked frame
     if frame_num == 0:
-        if delete_dir:
+        if delete_dir and not multi_thread:
             if os.path.isdir(io_args['output_mask_dir']):
                 os.system(f"rm -r {io_args['output_mask_dir']}")
             if os.path.isdir(io_args['output_masked_frame_dir']):
@@ -197,48 +201,85 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
             if os.path.isdir(io_args['output_masked_json_dir']):
                 os.system(f"rm -r {io_args['output_masked_json_dir']}")
     output_mask_dir = io_args['output_mask_dir']
-    create_dir(io_args['output_mask_dir'])
-    create_dir(io_args['output_masked_frame_dir'])
-    create_dir(io_args['output_masked_json_dir'])
-
+    if output_image:
+        create_dir(io_args['output_mask_dir'])
+        create_dir(io_args['output_masked_frame_dir'])
+    if not multi_thread:
+        create_dir(io_args['output_masked_json_dir'])
+    tracking_point_json = None
+    label_point = []
+    print(f'{io_args["output_masked_frame_dir"]}/tracking_point.json')
+    if os.path.isfile(f'{io_args["output_masked_frame_dir"]}/tracking_point.json'):
+        with open(f'{io_args["output_masked_frame_dir"]}/tracking_point.json') as json_data:
+            tracking_point_json = json.load(json_data)
+        for idx, i in enumerate(tracking_point_json["color_dict"]):
+            if len(i['color_label']) != 1:
+                label_point.append(idx)
+    print("label point is :", label_point)
     torch.cuda.empty_cache()
     gc.collect()
     sam_gap = SegTracker.sam_gap
-    frame_idx = 0
+    frame_idx = frame_num
     prev_center_dict = None
+    first_mask = SegTracker.first_frame_mask
+    if reversed:
+        print("Reversed mode is on.")
+        pred_list.append(first_mask)
     with torch.cuda.amp.autocast():
         while cap.isOpened():
+            #print("processed frame {}, obj_num {}      Step 1".format(frame_idx, SegTracker.get_obj_num()),end='\r')
+            if frame_idx < 0:
+                break
+            cap.set(1, frame_idx)
             ret, frame  = cap.read()
             if not ret:
                 break
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-
-            if frame_idx == 0:
+            #print("processed frame {}, obj_num {}      Step 2".format(frame_idx, SegTracker.get_obj_num()),end='\r')
+            if frame_idx == frame_num:
                 pred_mask = SegTracker.first_frame_mask
                 torch.cuda.empty_cache()
                 gc.collect()
-            elif (frame_idx % sam_gap) == 0:
-                seg_mask = SegTracker.seg(frame)
+            elif frame_idx in label_point:
+                #seg_mask = SegTracker.seg(frame)
+                SegTracker.restart_tracker()
                 torch.cuda.empty_cache()
                 gc.collect()
-                track_mask = SegTracker.track(frame)
+                #track_mask = SegTracker.track(frame)
                 # find new objects, and update tracker with new objects
-                new_obj_mask = SegTracker.find_new_objs(track_mask,seg_mask)
-                save_prediction(new_obj_mask, output_mask_dir, str(frame_idx+frame_num).zfill(5) + '_new.png')
-                pred_mask = track_mask + new_obj_mask
+                #new_obj_mask = SegTracker.find_new_objs(track_mask,seg_mask)
+                #save_prediction(new_obj_mask, output_mask_dir, str(frame_idx).zfill(5) + '_new.png')
+                width = tracking_point_json["width"]
+                height = tracking_point_json["height"]
+                pred_mask = np.zeros((height, width), dtype=int)
+                now_color_dict = tracking_point_json["color_dict"][frame_idx]
+                current_pos = 0
+                for label, count in zip(now_color_dict["color_label"], now_color_dict["color_count"]):
+                    for _ in range(count):
+                        row = current_pos // width
+                        col = current_pos % width
+                        pred_mask[row, col] = label
+                        current_pos += 1
                 # segtracker.restart_tracker()
-                print("video_type_input_tracking")
+                #print("video_type_input_tracking")
                 SegTracker.add_reference(frame, pred_mask)
             else:
                 pred_mask = SegTracker.track(frame,update_memory=True)
+            #print("processed frame {}, obj_num {}      Step 3".format(frame_idx, SegTracker.get_obj_num()),end='\r')
             torch.cuda.empty_cache()
             gc.collect()
             if output_image:
-                save_prediction(pred_mask, output_mask_dir, str(frame_idx + frame_num).zfill(5) + '.png')
+                save_prediction(pred_mask, output_mask_dir, str(frame_idx).zfill(5) + '.png')
             pred_list.append(pred_mask)
-
-            print("processed frame {}, obj_num {}".format(frame_idx + frame_num, SegTracker.get_obj_num()),end='\r')
-            frame_idx += 1
+            print("processed frame {}, obj_num {}      ".format(frame_idx, SegTracker.get_obj_num()),end='\r')
+            if reversed:
+                frame_idx -= 1
+            else:
+                frame_idx += 1
+            if reversed and frame_idx < end_frame:
+                break
+            elif not reversed and frame_idx > end_frame:
+                break
             if detect_check == True:
                 distance_dict, centers_dict = chack_group_distance(pred_mask)
                 current_displacements = dict()
@@ -272,6 +313,10 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
 
     # draw pred mask on frame and save as a video
     cap = cv2.VideoCapture(input_video)
+    if reversed:
+        cap.set(1, end_frame)
+    else:
+        cap.set(1, frame_num)
     # if frame_num > 0:
     #     for i in range(0, frame_num):
     #         cap.read()
@@ -279,7 +324,7 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
+    print(f'num_frame is :{num_frames}')
     fourcc =  cv2.VideoWriter_fourcc(*"mp4v")
     # if input_video[-3:]=='mp4':
     #     fourcc =  cv2.VideoWriter_fourcc(*"mp4v")
@@ -291,54 +336,118 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     name_list = io_args['output_video'].split('.') [:-1]
     part_i = 1
     #io_args['output_video'] = ''.join(name_list)+f'_part_{part_i}.mp4'
-    print(f"This is output video {io_args['output_video']}")
-    out = cv2.VideoWriter(io_args['output_video'], fourcc, fps, (width, height))
+    #print(f"This is output video {io_args['output_video']}")
+    if not multi_thread and False:
+        out = cv2.VideoWriter(io_args['output_video'], fourcc, fps, (width, height))
     #partial video
 
-
-    output_frame_idx = 0
+    if reversed:
+        output_frame_idx = (frame_num-end_frame)
+    else:
+        output_frame_idx = 0
+    print(frame_num)
     #with open(f"{io_args['output_masked_frame_dir']}/{str(frame_idx).zfill(5)}.json", 'w') as f:
     #    json.dump(data, f)
     color_label = []
     color_count = []
     json_dict = {}
     color_dict = []
+    if reversed:
+        if os.path.exists(f"{io_args['output_masked_json_dir']}/reverse_output.json"):
+            with open(f"{io_args['output_masked_json_dir']}/reverse_output.json") as f:
+                d = json.load(f)
+                color_dict = d['color_dict']
+        else:
+            for i in range(num_frames):
+                color_dict.append({'color_label':[0], 'color_count':[width*height], 'label_sum':dict()})
+    else:
+        if os.path.exists(f"{io_args['output_masked_json_dir']}/output.json"):
+            with open(f"{io_args['output_masked_json_dir']}/output.json") as f:
+                d = json.load(f)
+                color_dict = d['color_dict']
+        else:
+            for i in range(num_frames):
+                color_dict.append({'color_label':[0], 'color_count':[width*height], 'label_sum':dict()})
     frame_count = 0
     json_dict['width'] = width
     json_dict['height'] = height
+    if tracking_point_json is not None:
+        if SegTracker.get_obj_num() <= tracking_point_json['object_num']:
+            json_dict['object_num'] = tracking_point_json['object_num']
+            json_dict['label_series'] = tracking_point_json['label_series']
+        else:
+            json_dict['object_num'] = SegTracker.get_obj_num()
+            json_dict['label_series'] = current_label_dict
+    else:
+        json_dict['object_num'] = SegTracker.get_obj_num()
+        json_dict['label_series'] = current_label_dict
     while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
         color_label = []
         color_count = []
-        frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-        pred_mask = pred_list[output_frame_idx]
-        masked_frame = draw_mask(frame, pred_mask)
-        if output_image:
-            cv2.imwrite(f"{io_args['output_masked_frame_dir']}/{str(output_frame_idx).zfill(5)}.png", masked_frame[:, :, ::-1])
-        #print(len(pred_mask))
-        #print(len(pred_mask[0]))
+        try:
+            pred_mask = pred_list[output_frame_idx]
+        except:
+            print("Warning")
+            print(output_frame_idx)
+            raise
+        merged_list = []
         for i in pred_mask:
-            for j in i:
-                if len(color_label) == 0:
-                    color_label.append(int(j))
-                    color_count.append(0)
-                elif j != color_label[-1]:
-                    color_label.append(int(j))
-                    color_count.append(0)
-                color_count[-1] += 1
+            merged_list.extend(i)
+
+
+        g = groupby(merged_list)
+        label_sum_dict = dict()
+        for key, group in g:
+            now_total = len(list(group))
+            color_label.append(int(key))
+            color_count.append(now_total)
+            if str(key) != '0':
+                if str(key) not in label_sum_dict:
+                    label_sum_dict[str(key)] = now_total
+                else:
+                    label_sum_dict[str(key)] += now_total
+
         #print(color_label)
         #print(color_count)
-        color_dict.append({'color_label':color_label, 'color_count':color_count})
+        #color_dict.append({'color_label':color_label, 'color_count':color_count})
+        if reversed:
+            color_dict[(frame_num)-output_frame_idx] = {'color_label':color_label, 'color_count':color_count, 'label_sum':label_sum_dict}
+
+        else:
+            color_dict[output_frame_idx+frame_num] = {'color_label':color_label, 'color_count':color_count, 'label_sum':label_sum_dict}
         #masked_pred_list.append(masked_frame)
         #masked_frame = cv2.cvtColor(masked_frame,cv2.COLOR_RGB2BGR)
-        out.write(masked_frame)
+        #print(len(pred_mask))
+        #print(len(pred_mask[0]))
+        #video output part
+        if False:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+            masked_frame = draw_mask(frame, pred_mask)
+            if output_image:
+                if reversed:
+                    cv2.imwrite(f"{io_args['output_masked_frame_dir']}/{str(frame_num-output_frame_idx).zfill(5)}.png", masked_frame[:, :, ::-1])
+                else:
+                    cv2.imwrite(f"{io_args['output_masked_frame_dir']}/{str(output_frame_idx+frame_num).zfill(5)}.png", masked_frame[:, :, ::-1])
+            if not multi_thread:
+                out.write(masked_frame)
+        if reversed:
+            print('frame {} writed, with json at {}'.format(frame_num-output_frame_idx, (frame_num)-output_frame_idx),end='\r')
+        else:
+            print('frame {} writed'.format(output_frame_idx+frame_num),end='\r')
 
-        print('frame {} writed'.format(output_frame_idx),end='\r')
-        output_frame_idx += 1
-        if output_frame_idx >= frame_idx:
-            break
+        if reversed:
+            output_frame_idx -= 1
+            if output_frame_idx < 0:
+                break
+        else:
+            output_frame_idx += 1
+            if output_frame_idx >= len(pred_list):
+                break
+
+
         #if frame_idx % 900 == 0:
         #    out.release()
         #    part_i += 1
@@ -346,8 +455,15 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
         #    print(f"This is output video {io_args['output_video']}")
         #    out = cv2.VideoWriter(io_args['output_video'], fourcc, fps, (width, height))
     json_dict['color_dict'] = color_dict
-    with open(f"{io_args['output_masked_json_dir']}/mask.json", 'w') as f:
-        json.dump(json_dict, f)
+    if not multi_thread:
+        if reversed:
+            print("This is output path: ", f"{io_args['output_masked_json_dir']}/reverse_output.json")
+            with open(f"{io_args['output_masked_json_dir']}/reverse_output.json", 'w') as f:
+                json.dump(json_dict, f)
+        else:
+            print("This is output path: ", f"{io_args['output_masked_json_dir']}/output.json")
+            with open(f"{io_args['output_masked_json_dir']}/output.json", 'w') as f:
+                json.dump(json_dict, f)
     #out.release()
     cap.release()
     print("\n{} saved".format(io_args['output_video']))
@@ -366,9 +482,12 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     del SegTracker
     torch.cuda.empty_cache()
     gc.collect()
-
-    return io_args['output_video'], f"{io_args['tracking_result_dir']}/{video_name}_pred_mask.zip"
-
+    if not multi_thread:
+        return io_args['output_video'], f"{io_args['tracking_result_dir']}/{video_name}_pred_mask.zip"
+    else:
+        start_idx = frame_num if frame_num<end_frame else end_frame
+        end_idx = frame_num if frame_num>end_frame else end_frame
+        return json_dict
 
 def img_seq_type_input_tracking(SegTracker, io_args, video_name, imgs_path, fps, frame_num=0, delete_dir=True, output_image=True):
 

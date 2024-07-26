@@ -100,7 +100,7 @@ def draw_block(img, mask, width, height, alpha=1, id_countour=False):
 
 frame_idx = 0
 
-video_name = 'blackswan'
+video_name = '00_P2'
 tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
 io_args = {
     'tracking_result_dir': tracking_result_dir,
@@ -135,6 +135,7 @@ width = data['width']
 height = data['height']
 total_frame = len(data['color_dict'])
 for i in range(total_frame):
+    break
     pred_mask = []
     for idx in range(len(data['color_dict'][i]['color_label'])):
         d = data['color_dict'][i]
@@ -146,7 +147,8 @@ for i in range(total_frame):
     print('json {}/{} writed'.format(i+1,total_frame),end='\r')
 print('')
 draw_video = True
-input_video = f'U:\\sat\\Segment-and-Track-Anything\\assets\\{video_name}.mp4'
+input_video = f'U:\\sat\\Segment-and-Track-Anything-git-ver\\Segment-and-Track-Anything\\assets\\chop_video\\{video_name}.mp4'
+
 if draw_video:
     cap = cv2.VideoCapture(input_video)
     # if frame_num > 0:
@@ -200,7 +202,7 @@ if draw_video:
 
         masked_frame = draw_mask(frame, pred_mask)
         block_frame = draw_block(frame, pred_mask, width, height)
-        cv2.imwrite(f"{io_args['output_masked_frame_dir']}/{str(frame_idx).zfill(5)}.png", masked_frame[:, :, ::-1])
+        #cv2.imwrite(f"{io_args['output_masked_frame_dir']}/{str(frame_idx).zfill(5)}.png", masked_frame[:, :, ::-1])
         #print(len(pred_mask))
         #print(len(pred_mask[0]))
         for i in pred_mask:

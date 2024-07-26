@@ -105,6 +105,7 @@ class SegTracker():
         pred_mask = self.tracker.track(frame)
         if update_memory:
             self.tracker.update_memory(pred_mask)
+        #print("IN                                           ",end='\r')
         return pred_mask.squeeze(0).squeeze(0).detach().cpu().numpy().astype(np.uint8)
 
     def get_tracking_objs(self):

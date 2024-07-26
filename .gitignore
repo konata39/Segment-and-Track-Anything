@@ -3,6 +3,7 @@ ckpt/*
 assets/*
 # assets/*zip
 *.pyc
+*.bat
 debug
 cym_utils
 /src
