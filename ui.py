@@ -213,14 +213,14 @@ class DataLabelingApp:
 
         # Frame for controls
         self.label_frame = tk.Frame(master)
-        self.label_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.label_frame.pack(fill=tk.X, side=tk.TOP, padx=10)
 
         self.info_label = tk.Label(self.label_frame, text='current frame: \npath: ', anchor="e", justify=tk.LEFT)
         self.info_label.pack(side="right",anchor="n")
 
         # Frame for controls
         self.control_frame = tk.Frame(master)
-        self.control_frame.pack(fill=tk.X, side=tk.TOP, padx=10, pady=5, ipady=30)
+        self.control_frame.pack(fill=tk.X, side=tk.TOP, padx=10, ipady=30)
         
         self.upper_control_frame = tk.Frame(self.control_frame)
         self.upper_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
@@ -236,8 +236,8 @@ class DataLabelingApp:
         self.load_video_button.place(relx=0, relheight=1, relwidth=0.05)
 
         # Scroll bar for video navigation
-        self.video_scroll = tk.Scale(self.upper_control_frame, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_video_frame)
-        self.video_scroll.place(relx=0.05, relheight=1, relwidth=0.18)
+        self.video_scroll = tk.Scale(self.upper_control_frame,width=15, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_video_frame)
+        self.video_scroll.place(relx=0.05, rely=-0.1, relheight=1.1, relwidth=0.18)
         self.master.bind("<Left>", self.prev_frame)
         self.master.bind("<Right>", self.next_frame)
 
@@ -330,7 +330,7 @@ class DataLabelingApp:
 
         # Dropdown menu for label codes
         self.label_code_menu = tk.OptionMenu(self.lower_control_frame, self.current_label_code, "1", "2", "3", "4", "5", "6")
-        self.label_code_menu.place(relx=0.28,rely=0.2, relheight=0.6, relwidth=0.07)
+        self.label_code_menu.place(relx=0.28, relheight=1, relwidth=0.07)
         self.label_code_menu.configure(width=4)
 
         # Labeling buttons
