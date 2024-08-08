@@ -220,58 +220,67 @@ class DataLabelingApp:
 
         # Frame for controls
         self.control_frame = tk.Frame(master)
-        self.control_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.control_frame.pack(fill=tk.X, side=tk.TOP, padx=10, pady=5, ipady=30)
+        
+        self.upper_control_frame = tk.Frame(self.control_frame)
+        self.upper_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
+        
+        self.lower_control_frame = tk.Frame(self.control_frame)
+        self.lower_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
+        
+        self.abnormal_control_frame = tk.Frame(self.control_frame)
+        self.abnormal_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
 
         # Load video button
-        self.load_video_button = tk.Button(self.control_frame, text="Load Video", command=self.load_video)
-        self.load_video_button.pack(side=tk.LEFT)
+        self.load_video_button = tk.Button(self.upper_control_frame, text="Load Video", command=self.load_video)
+        self.load_video_button.place(relx=0, relheight=1, relwidth=0.05)
 
         # Scroll bar for video navigation
-        self.video_scroll = tk.Scale(self.control_frame, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_video_frame)
-        self.video_scroll.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.video_scroll = tk.Scale(self.upper_control_frame, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_video_frame)
+        self.video_scroll.place(relx=0.05, relheight=1, relwidth=0.18)
         self.master.bind("<Left>", self.prev_frame)
         self.master.bind("<Right>", self.next_frame)
 
         #input for frae
         vcmd = (self.master.register(self.validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
-        self.entry = tk.Entry(self.control_frame, textvariable=self.current_frame_num, validate = 'key', validatecommand = vcmd)
-        self.entry.pack(side=tk.LEFT)
+        self.entry = tk.Entry(self.upper_control_frame, textvariable=self.current_frame_num, validate = 'key', validatecommand = vcmd)
+        self.entry.place(relx=0.23, relheight=1, relwidth=0.04)
 
 
-        self.jump_button = tk.Button(self.control_frame, text="Jump to frame", command=self.jump_to_frame)
-        self.jump_button.pack(side=tk.LEFT)
+        self.jump_button = tk.Button(self.upper_control_frame, text="Jump to frame", command=self.jump_to_frame)
+        self.jump_button.place(relx=0.27, relheight=1, relwidth=0.06)
 
-        #self.end_check = tk.IntVar()
-        #self.c3 = tk.Checkbutton(self.control_frame, text='Ending frame',variable=self.end_check, onvalue=True, offvalue=False)
-        #self.c3.pack(side=tk.LEFT)
+        self.end_check = tk.IntVar()
+        self.c3 = tk.Checkbutton(self.upper_control_frame, text='Ending frame',variable=self.end_check, onvalue=True, offvalue=False)
+        self.c3.place(relx=0.33, relheight=1, relwidth=0.07)
 
-        self.second_label = tk.Label(self.control_frame, text='second:')
-        self.second_label.pack(side=tk.LEFT)
+        self.second_label = tk.Label(self.upper_control_frame, text='second:')
+        self.second_label.place(relx=0.41, relheight=1, relwidth=0.03)
 
         #input for second
-        self.entry_second = tk.Entry(self.control_frame, textvariable=self.current_second_num, validate = 'key', validatecommand = vcmd)
-        self.entry_second.pack(side=tk.LEFT)
+        self.entry_second = tk.Entry(self.upper_control_frame, textvariable=self.current_second_num, validate = 'key', validatecommand = vcmd)
+        self.entry_second.place(relx=0.44, relheight=1, relwidth=0.06)
 
-        self.jump_second_button = tk.Button(self.control_frame, text="Jump to second", command=self.jump_to_second)
-        self.jump_second_button.pack(side=tk.LEFT)
+        self.jump_second_button = tk.Button(self.upper_control_frame, text="Jump to second", command=self.jump_to_second)
+        self.jump_second_button.place(relx=0.5, relheight=1, relwidth=0.08)
 
 
         # Button to capture current frame to mark
-        self.capture_frame_button = tk.Button(self.control_frame, text="Capture Frame", command=self.capture_frame)
-        self.capture_frame_button.pack(side=tk.LEFT)
+        self.capture_frame_button = tk.Button(self.upper_control_frame, text="Capture Frame", command=self.capture_frame)
+        self.capture_frame_button.place(relx=0.58, relheight=1, relwidth=0.06)
 
-        self.track_labels_button = tk.Button(self.control_frame, text="Track Video", command=self.track_labels_all)
-        self.track_labels_button.pack(side=tk.LEFT)
+        self.track_labels_button = tk.Button(self.upper_control_frame, text="Track Video", command=self.track_labels_all)
+        self.track_labels_button.place(relx=0.64, relheight=1, relwidth=0.06)
 
-        self.track_labels_frame_button = tk.Button(self.control_frame, text="Track Video to Frame", command=self.track_labels_frame)
-        self.track_labels_frame_button.pack(side=tk.LEFT)
+        self.track_labels_frame_button = tk.Button(self.upper_control_frame, text="Track Video to Frame", command=self.track_labels_frame)
+        self.track_labels_frame_button.place(relx=0.7, relheight=1, relwidth=0.1)
 
-        self.entry_end = tk.Entry(self.control_frame, textvariable=self.end_frame, validate = 'key', validatecommand = vcmd)
-        self.entry_end.pack(side=tk.LEFT)
+        self.entry_end = tk.Entry(self.upper_control_frame, textvariable=self.end_frame, validate = 'key', validatecommand = vcmd)
+        self.entry_end.place(relx=0.8, relheight=1, relwidth=0.08)
 
         self.ab_check = tk.IntVar()
-        self.c1 = tk.Checkbutton(self.control_frame, text='Check abnormal when tracking',variable=self.ab_check, onvalue=True, offvalue=False)
-        self.c1.pack(side=tk.LEFT)
+        self.c1 = tk.Checkbutton(self.upper_control_frame, text='Check abnormal when tracking',variable=self.ab_check, onvalue=True, offvalue=False)
+        self.c1.place(relx=0.86, relheight=1, relwidth=0.14)
 
         self.cap = None
         self.current_frame = None
@@ -308,63 +317,59 @@ class DataLabelingApp:
         self.current_label_code.set("1")  # Default value
         self.current_label_code.trace("w", self.label_change)
 
-        # Frame for controls
-        self.control_frame = tk.Frame(master)
-        self.control_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Load mask button
+        self.load_json_button = tk.Button(self.lower_control_frame, text="Load JSON", command=self.load_json_data)
+        self.load_json_button.place(relx=0, relheight=1, relwidth=0.05)
 
         # Load mask button
-        self.load_json_button = tk.Button(self.control_frame, text="Load JSON", command=self.load_json_data)
-        self.load_json_button.pack(side=tk.LEFT)
+        self.load_default_json_button = tk.Button(self.lower_control_frame, text="Load default JSON", command=self.load_default_json_data)
+        self.load_default_json_button.place(relx=0.05, relheight=1, relwidth=0.08)
 
-        # Load mask button
-        self.load_default_json_button = tk.Button(self.control_frame, text="Load default JSON", command=self.load_default_json_data)
-        self.load_default_json_button.pack(side=tk.LEFT)
-
-        #self.find_large_range_button = tk.Button(self.control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
-        #self.find_large_range_button.pack(side=tk.LEFT)
+        self.find_large_range_button = tk.Button(self.lower_control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
+        self.find_large_range_button.place(relx=0.13, relheight=1, relwidth=0.15)
 
         # Dropdown menu for label codes
-        self.label_code_menu = tk.OptionMenu(self.control_frame, self.current_label_code, "1", "2", "3", "4", "5", "6")
-        self.label_code_menu.pack(side=tk.LEFT)
+        self.label_code_menu = tk.OptionMenu(self.lower_control_frame, self.current_label_code, "1", "2", "3", "4", "5", "6")
+        self.label_code_menu.place(relx=0.28,rely=0.2, relheight=0.6, relwidth=0.07)
         self.label_code_menu.configure(width=4)
 
         # Labeling buttons
-        self.add_label_button = tk.Button(self.control_frame, text="Add Label", command=self.add_label)
-        self.add_label_button.pack(side=tk.LEFT)
+        self.add_label_button = tk.Button(self.lower_control_frame, text="Add Label", command=self.add_label)
+        self.add_label_button.place(relx=0.35, relheight=1, relwidth=0.05)
 
-        self.del_label_button = tk.Button(self.control_frame, text="Delete Label", command=self.del_label)
-        self.del_label_button.pack(side=tk.LEFT)
-
-        # Labeling buttons
-        self.positive_button = tk.Button(self.control_frame, text="Positive Label", command=lambda: self.toggle_label("positive"))
-        self.positive_button.pack(side=tk.LEFT)
-
-        self.negative_button = tk.Button(self.control_frame, text="Negative Label", command=lambda: self.toggle_label("negative"))
-        self.negative_button.pack(side=tk.LEFT)
+        self.del_label_button = tk.Button(self.lower_control_frame, text="Delete Label", command=self.del_label)
+        self.del_label_button.place(relx=0.4, relheight=1, relwidth=0.08)
 
         # Labeling buttons
-        self.reset_button = tk.Button(self.control_frame, text="Reset", command=self.reset_label)
-        self.reset_button.pack(side=tk.LEFT)
+        self.positive_button = tk.Button(self.lower_control_frame, text="Positive Label", command=lambda: self.toggle_label("positive"))
+        self.positive_button.place(relx=0.48, relheight=1, relwidth=0.07)
+
+        self.negative_button = tk.Button(self.lower_control_frame, text="Negative Label", command=lambda: self.toggle_label("negative"))
+        self.negative_button.place(relx=0.55, relheight=1, relwidth=0.07)
+
+        # Labeling buttons
+        self.reset_button = tk.Button(self.lower_control_frame, text="Reset", command=self.reset_label)
+        self.reset_button.place(relx=0.62, relheight=1, relwidth=0.04)
 
         # Save manual mask
-        self.save_manual_mask_button = tk.Button(self.control_frame, text="Save manual mask", command=self.save_manual_mask)
-        self.save_manual_mask_button.pack(side=tk.LEFT)
+        self.save_manual_mask_button = tk.Button(self.lower_control_frame, text="Save manual mask", command=self.save_manual_mask)
+        self.save_manual_mask_button.place(relx=0.66, relheight=1, relwidth=0.08)
 
         # Save tracking point
-        self.save_tracking_point_button = tk.Button(self.control_frame, text="Save tracking point", command=self.save_tracking_point)
-        self.save_tracking_point_button.pack(side=tk.LEFT)
+        self.save_tracking_point_button = tk.Button(self.lower_control_frame, text="Save tracking point", command=self.save_tracking_point)
+        self.save_tracking_point_button.place(relx=0.74, relheight=1, relwidth=0.1)
 
-        self.find_previous_abnormal_button = tk.Button(self.control_frame, text="Find previous abnormal frame", command=self.find_previous_abnormal)
-        self.find_previous_abnormal_button.pack(side=tk.LEFT)
+        self.find_previous_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find previous abnormal frame", command=self.find_previous_abnormal)
+        self.find_previous_abnormal_button.place(relx=0, relheight=1, relwidth=0.15)
 
-        self.find_next_abnormal_button = tk.Button(self.control_frame, text="Find next abnormal frame", command=self.find_next_abnormal)
-        self.find_next_abnormal_button.pack(side=tk.LEFT)
+        self.find_next_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find next abnormal frame", command=self.find_next_abnormal)
+        self.find_next_abnormal_button.place(relx=0.15, relheight=1, relwidth=0.15)
 
-        self.find_all_abnormal_button = tk.Button(self.control_frame, text="Find all abnormal frame", command=self.find_all_abnormal)
-        self.find_all_abnormal_button.pack(side=tk.LEFT)
+        self.find_all_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find all abnormal frame", command=self.find_all_abnormal)
+        self.find_all_abnormal_button.place(relx=0.3, relheight=1, relwidth=0.15)
 
-        self.save_abnormal_frame_button = tk.Button(self.control_frame, text="Save abnormal frame", command=self.output_abnormal_frame)
-        self.save_abnormal_frame_button.pack(side=tk.LEFT)
+        self.save_abnormal_frame_button = tk.Button(self.abnormal_control_frame, text="Save abnormal frame", command=self.output_abnormal_frame)
+        self.save_abnormal_frame_button.place(relx=0.45, relheight=1, relwidth=0.15)
 
         #self.reversed_check = tk.IntVar()
         #self.c2 = tk.Checkbutton(self.control_frame, text='Reversed tracking',variable=self.reversed_check, onvalue=True, offvalue=False)
@@ -751,12 +756,19 @@ class DataLabelingApp:
 
     def on_window_resize(self, event):
         # Adjust the video frame according to the window size
+        self.master.update_idletasks()
+        new_width = int(self.master.winfo_width()*0.49)
+        new_height = int(self.master.winfo_height()*0.7)
+        self.video_canvas.config(width=new_width, height=new_height)
+        self.image_canvas.config(width=new_width, height=new_height)
         if self.current_frame_in_canvas is not None:
             self.display_frame_in_canvas(self.current_frame_in_canvas, self.video_canvas)
         # Adjust the captured image frame according to the window size
         if self.masked_frame is not None:
             self.display_frame_in_canvas(self.masked_frame, self.image_canvas)
-
+        #self.video_canvas.update_idletasks()
+        #print("this width is:",self.video_canvas.winfo_width())
+        
     def load_json(self, filepath):
         with open(filepath, 'r') as file:
             data = json.load(file)
