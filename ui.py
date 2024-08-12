@@ -22,9 +22,13 @@ from random import randrange
 from tkinter.simpledialog import askstring
 
 
-def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, end_check, end_frame, click_stack, current_label_dict, overwrite):
+def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, end_check, end_frame, click_stack, current_label_dict, overwrite, os_env):
     video_name = '.'.join(os.path.basename(video_path).split('.')[:-1])
-    tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
+    #path tag to change posix
+    if self.os_env == 'posix':
+        pass
+    elif self.os_env == 'nt':
+        tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
 
     output_masked_json_dir= f'{tracking_result_dir}'
     if end_frame < iframe:
@@ -32,13 +36,13 @@ def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, en
     else:
         reversed = False
     if end_check:
-        result = tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, end_frame, False, False, detect_check, reversed, False, current_label_dict)
+        result = tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, end_frame, False, False, detect_check, reversed, False, current_label_dict, os_env)
         if result == None:
             messagebox.showinfo('Finish', "No label mask and manual mask. Exit.")
             return
         messagebox.showinfo('Finish', f'Tracking success. output file is at \n{output_masked_json_dir}')
     else:
-        result = tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, -1, False, False, detect_check, False, current_label_dict)
+        result = tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, -1, False, False, detect_check, False, current_label_dict, os_env)
         if result == None:
             messagebox.showinfo('Finish', "No label mask and manual mask. Exit.")
             return
@@ -86,9 +90,13 @@ def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, en
                 json.dump(manual_point_json, f)
 
         vaild_point_list.append(end_frame)
-        with open(f'{tracking_result_dir}/multi_track_execute.bat', 'w') as bat_output:
-            for i in range(len(vaild_point_list)-1):
-                bat_output.write(f'start python multi_tracking.py {video_path} {tracking_result_dir}/tracking_point.json {vaild_point_list[i]} {vaild_point_list[i+1]} {reversed}\n')
+        #path tag to change posix
+        if self.os_env == 'posix':
+            pass
+        elif self.os_env == 'nt':
+            with open(f'{tracking_result_dir}/multi_track_execute.bat', 'w') as bat_output:
+                for i in range(len(vaild_point_list)-1):
+                    bat_output.write(f'start python multi_tracking.py {video_path} {tracking_result_dir}/tracking_point.json {vaild_point_list[i]} {vaild_point_list[i+1]} {reversed}\n')
         messagebox.showinfo('Finish', f'Multi track file generated. Please execute "multi_track_execute.bat" on cmd.')
     else:
         vcap = cv2.VideoCapture(video_path)
@@ -188,6 +196,7 @@ class DataLabelingApp:
         self.ab_check_threading = 0
         self.end_check_threading = 0
         self.entry_end_threading = 0
+        self.os_env = os.name #LINUX:"posix", WIN:"nt"
 
         #SAT Parameters
         aot_args["model"] = 'r50_deaotl'
@@ -221,13 +230,13 @@ class DataLabelingApp:
         # Frame for controls
         self.control_frame = tk.Frame(master)
         self.control_frame.pack(fill=tk.X, side=tk.TOP, padx=10, pady=5, ipady=30)
-        
+
         self.upper_control_frame = tk.Frame(self.control_frame)
         self.upper_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
-        
+
         self.lower_control_frame = tk.Frame(self.control_frame)
         self.lower_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
-        
+
         self.abnormal_control_frame = tk.Frame(self.control_frame)
         self.abnormal_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
 
@@ -654,7 +663,11 @@ class DataLabelingApp:
     def save_manual_mask(self):
         if self.video_path is not None:
             #WTD: change file path name
-            save_path = self.video_path.replace('assets', 'tracking_results').replace('.mp4', '').replace('raw_video/', '')
+            #path tag to change posix
+            if self.os_env == 'posix':
+                pass
+            elif self.os_env == 'nt':
+                save_path = self.video_path.replace('assets', 'tracking_results').replace('.mp4', '').replace('raw_video/', '')
             save_mask_path = save_path
             if not os.path.exists(save_mask_path):
                 os.makedirs(save_mask_path)
@@ -725,7 +738,12 @@ class DataLabelingApp:
             #    json.dump(json_dict, f)
             #    print("mask saved.")
     def save_tracking_point(self):
-        save_path = self.video_path.replace('assets', 'tracking_results').replace('.mp4', '').replace('raw_video/', '')
+        #path tag to change posix
+        video_name = '.'.join(os.path.basename(self.video_path).split('.')[:-1])
+        if self.os_env == 'posix':
+            pass
+        elif self.os_env == 'nt':
+            save_path = os.path.dirname(self.video_path).replace('assets', 'tracking_results')+f'/{video_name}'
         tracking_point_list = []
         if os.path.isfile(f'{save_path}/tracking_point_list.json'):
             with open(f'{save_path}/tracking_point_list.json') as json_data:
@@ -768,7 +786,7 @@ class DataLabelingApp:
             self.display_frame_in_canvas(self.masked_frame, self.image_canvas)
         #self.video_canvas.update_idletasks()
         #print("this width is:",self.video_canvas.winfo_width())
-        
+
     def load_json(self, filepath):
         with open(filepath, 'r') as file:
             data = json.load(file)
@@ -834,11 +852,15 @@ class DataLabelingApp:
 
 
     def load_default_json_data(self):
+        #path tag to change posix
         if self.video_path is None:
             print("Video is not loading.")
             return
         video_name = '.'.join(os.path.basename(self.video_path).split('.')[:-1])
-        tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
+        if self.os_env == 'posix':
+            pass
+        elif self.os_env == 'nt':
+            tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
         filepath = f'{tracking_result_dir}/tracking_point.json'
         if filepath:
             with open(filepath, 'r') as file:
@@ -988,7 +1010,11 @@ class DataLabelingApp:
             label_point = []
             tracking_point_json = None
             video_name = '.'.join(os.path.basename(self.video_path).split('.')[:-1])
-            tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
+            #path tag to change posix
+            if self.os_env == 'posix':
+                pass
+            elif self.os_env == 'nt':
+                tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
             filepath = f'{tracking_result_dir}/tracking_point.json'
             if os.path.isfile(f'{tracking_result_dir}/tracking_point.json'):
                 with open(f'{tracking_result_dir}/tracking_point.json') as json_data:
@@ -1060,7 +1086,8 @@ class DataLabelingApp:
                 self.entry_end_threading,
                 self.click_stack,
                 self.current_label_dict,
-                overwrite))
+                overwrite,
+                self.os_env))
             self.thread_video.start()
 
             #reverse track after normal track
@@ -1119,7 +1146,8 @@ class DataLabelingApp:
                 self.entry_end_reverse_threading,
                 self.click_stack,
                 self.current_label_dict,
-                overwrite))
+                overwrite,
+                self.os_env))
             self.thread_reverse_video.start()
 
     def track_labels_all(self):
@@ -1371,6 +1399,7 @@ class DataLabelingApp:
 
     def output_abnormal_frame(self, event=None):
         #print(self.abnormal_list)
+        #path tag to change posix
         Path("./abnormal_list").mkdir(parents=True, exist_ok=True)
         out_file = open("./abnormal_list/myfile.json", "w")
         json.dump(self.abnormal_list, out_file, indent = 6)

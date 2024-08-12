@@ -138,7 +138,7 @@ aot_model2ckpt = {
 }
 
 
-def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame_num=0, end_frame=-1, delete_dir=True, output_image=True, detect_check=False, reversed=False, multi_thread=False, current_label_dict=None):
+def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame_num=0, end_frame=-1, delete_dir=True, output_image=True, detect_check=False, reversed=False, multi_thread=False, current_label_dict=None, os_env='nt'):
     end_frame = int(end_frame)
     if input_video is not None:
         video_name = '.'.join(os.path.basename(input_video).split('.')[:-1])
@@ -151,7 +151,11 @@ def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame
     else:
         return None, None
     # create dir to save result
-    tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
+    #path tag to change posix
+    if os_env == 'posix':
+        pass
+    elif os_env == 'nt':
+        tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
     create_dir(tracking_result_dir)
 
     io_args = {
