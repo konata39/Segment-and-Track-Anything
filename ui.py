@@ -180,7 +180,7 @@ class DataLabelingApp:
         self.master = master
         master.title("Data Labeling Tool")
 
-        self.DEFAULT_LABEL_DICT = {1: 'O',2: 'X',3: 'xx',4: 'nn',5: 'ss',6: 'H'}
+        self.DEFAULT_LABEL_DICT = {"1": 'O',"2": 'X',"3": 'xx',"4": 'nn','5': 'ss','6': 'H'}
         self.current_label_dict = dict()
 
         self.current_frame_num = tk.IntVar(value=0)
@@ -316,11 +316,11 @@ class DataLabelingApp:
         self.labels_history = []  # To store the history of label operations
         self.json_data = None  # To store json
         self.label_colors = {
-            1: tuple(_palette[0:3]),  
-            2: tuple(_palette[3:6]),  
-            3: tuple(_palette[6:9]),  
-            4: tuple(_palette[9:12]),  
-            5: tuple(_palette[12:15]),  
+            1: tuple(_palette[0:3]),
+            2: tuple(_palette[3:6]),
+            3: tuple(_palette[6:9]),
+            4: tuple(_palette[9:12]),
+            5: tuple(_palette[12:15]),
             6: tuple(_palette[15:18])
         }
 
@@ -337,39 +337,36 @@ class DataLabelingApp:
         self.load_default_json_button = tk.Button(self.lower_control_frame, text="Load default JSON", command=self.load_default_json_data)
         self.load_default_json_button.place(relx=0.05, relheight=1, relwidth=0.08)
 
-        self.find_large_range_button = tk.Button(self.lower_control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
-        self.find_large_range_button.place(relx=0.13, relheight=1, relwidth=0.15)
-
         # Dropdown menu for label codes
         self.label_code_menu = tk.OptionMenu(self.lower_control_frame, self.current_label_code, "1", "2", "3", "4", "5", "6")
-        self.label_code_menu.place(relx=0.28, relheight=1, relwidth=0.07)
+        self.label_code_menu.place(relx=0.13, relheight=1, relwidth=0.07)
         self.label_code_menu.configure(width=4)
 
         # Labeling buttons
         self.add_label_button = tk.Button(self.lower_control_frame, text="Add Label", command=self.add_label)
-        self.add_label_button.place(relx=0.35, relheight=1, relwidth=0.05)
+        self.add_label_button.place(relx=0.2, relheight=1, relwidth=0.05)
 
         self.del_label_button = tk.Button(self.lower_control_frame, text="Delete Label", command=self.del_label)
-        self.del_label_button.place(relx=0.4, relheight=1, relwidth=0.08)
+        self.del_label_button.place(relx=0.25, relheight=1, relwidth=0.08)
 
         # Labeling buttons
         self.positive_button = tk.Button(self.lower_control_frame, text="Positive Label", command=lambda: self.toggle_label("positive"))
-        self.positive_button.place(relx=0.48, relheight=1, relwidth=0.07)
+        self.positive_button.place(relx=0.33, relheight=1, relwidth=0.07)
 
         self.negative_button = tk.Button(self.lower_control_frame, text="Negative Label", command=lambda: self.toggle_label("negative"))
-        self.negative_button.place(relx=0.55, relheight=1, relwidth=0.07)
+        self.negative_button.place(relx=0.4, relheight=1, relwidth=0.07)
 
         # Labeling buttons
         self.reset_button = tk.Button(self.lower_control_frame, text="Reset", command=self.reset_label)
-        self.reset_button.place(relx=0.62, relheight=1, relwidth=0.04)
+        self.reset_button.place(relx=0.47, relheight=1, relwidth=0.04)
 
         # Save manual mask
         self.save_manual_mask_button = tk.Button(self.lower_control_frame, text="Save manual mask", command=self.save_manual_mask)
-        self.save_manual_mask_button.place(relx=0.66, relheight=1, relwidth=0.08)
+        self.save_manual_mask_button.place(relx=0.51, relheight=1, relwidth=0.08)
 
         # Save tracking point
         self.save_tracking_point_button = tk.Button(self.lower_control_frame, text="Save tracking point", command=self.save_tracking_point)
-        self.save_tracking_point_button.place(relx=0.74, relheight=1, relwidth=0.1)
+        self.save_tracking_point_button.place(relx=0.59, relheight=1, relwidth=0.1)
 
         self.find_previous_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find previous abnormal frame", command=self.find_previous_abnormal)
         self.find_previous_abnormal_button.place(relx=0, relheight=1, relwidth=0.15)
@@ -377,11 +374,14 @@ class DataLabelingApp:
         self.find_next_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find next abnormal frame", command=self.find_next_abnormal)
         self.find_next_abnormal_button.place(relx=0.15, relheight=1, relwidth=0.15)
 
+        self.find_large_range_button = tk.Button(self.abnormal_control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
+        self.find_large_range_button.place(relx=0.3, relheight=1, relwidth=0.15)
+
         self.find_all_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find all abnormal frame", command=self.find_all_abnormal)
-        self.find_all_abnormal_button.place(relx=0.3, relheight=1, relwidth=0.15)
+        self.find_all_abnormal_button.place(relx=0.45, relheight=1, relwidth=0.15)
 
         self.save_abnormal_frame_button = tk.Button(self.abnormal_control_frame, text="Save abnormal frame", command=self.output_abnormal_frame)
-        self.save_abnormal_frame_button.place(relx=0.45, relheight=1, relwidth=0.15)
+        self.save_abnormal_frame_button.place(relx=0.6, relheight=1, relwidth=0.15)
 
         #self.reversed_check = tk.IntVar()
         #self.c2 = tk.Checkbutton(self.control_frame, text='Reversed tracking',variable=self.reversed_check, onvalue=True, offvalue=False)
@@ -448,9 +448,9 @@ class DataLabelingApp:
             menu.delete(0, "end")
             first_element = False
             for i in self.current_label_dict:
-                label_name = self.current_label_dict[i]
+                label_name = self.current_label_dict[str(i)]
                 menu.add_command(label=label_name, command=tk._setit(self.current_label_code, str(label_name)))
-            self.current_label_code.set(self.current_label_dict[1])
+            self.current_label_code.set(self.current_label_dict["1"])
             #==
             self.video_scroll.set(0)
             self.video_path = file_path
@@ -835,7 +835,7 @@ class DataLabelingApp:
                 first_element = False
                 idx_num = 0
                 for i in self.current_label_dict:
-                    label_name = self.current_label_dict[i]
+                    label_name = self.current_label_dict[str(i)]
                     menu.add_command(label=label_name, command=tk._setit(self.current_label_code, str(label_name)))
                     idx_num += 1
                     if idx_num > segtracker_args["max_obj_num"]:
@@ -890,7 +890,7 @@ class DataLabelingApp:
                 first_element = False
                 idx_num = 0
                 for i in self.current_label_dict:
-                    label_name = self.current_label_dict[i]
+                    label_name = self.current_label_dict[str(i)]
                     menu.add_command(label=label_name, command=tk._setit(self.current_label_code, str(label_name)))
                     idx_num += 1
                     if idx_num > segtracker_args["max_obj_num"]:
@@ -923,7 +923,7 @@ class DataLabelingApp:
         self.click_stack.append([[],[]])
         self.label_colors[segtracker_args["max_obj_num"]] = (randrange(256), randrange(256), randrange(256))
         menu.add_command(label=name, command=tk._setit(self.current_label_code, name))
-        self.current_label_dict[add_index] = name
+        self.current_label_dict[str(add_index)] = name
         #print(self.current_label_dict)
 
     def del_label(self):
@@ -933,7 +933,7 @@ class DataLabelingApp:
         self.click_stack.pop()
         del self.label_colors[segtracker_args["max_obj_num"]]
         segtracker_args["max_obj_num"] = segtracker_args["max_obj_num"]-1
-        self.current_label_code.set(self.current_label_dict[1])  # Default value
+        self.current_label_code.set(self.current_label_dict["1"])  # Default value
 
     def on_video_frame_click(self, event):
         # 获取Canvas的当前大小
@@ -963,7 +963,7 @@ class DataLabelingApp:
                 label = self.current_mask[y, x]
                 if label != 0:
                     menu = self.label_code_menu["menu"]
-                    self.current_label_code.set(self.current_label_dict[label])
+                    self.current_label_code.set(self.current_label_dict[str(label)])
 
     def label_change(self, *args):
         #prev_mask = self.Seg_Tracker.first_frame_mask
@@ -1208,6 +1208,11 @@ class DataLabelingApp:
             check_min_area = any(x > 0 and x < min_area for x in total_label_count)
             #print(total_label_count)
             if check_min_area:
+                abnormal_label = 0
+                for i in range(len(total_label_count)):
+                    if total_label_count[i] != 0:
+                        abnormal_label = i
+                        break
                 self.video_scroll.set(idx)
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
                 ret, frame = self.cap.read()
@@ -1216,7 +1221,8 @@ class DataLabelingApp:
                 frame = self.apply_mask_to_frame(frame, mask)
                 self.current_frame_in_canvas = frame
                 self.display_frame_in_canvas(frame, self.video_canvas)
-                messagebox.showinfo("found abnormal", "found abnormal min area")
+                menu = self.label_code_menu["menu"]
+                messagebox.showinfo("found abnormal", f"found abnormal label {self.current_label_dict[str(i+1)]}: area too small")
                 self.abnormal_list.append(idx)
                 self.idx = len(self.abnormal_list) - 1
                 found = 1
@@ -1237,7 +1243,13 @@ class DataLabelingApp:
             for value, dist in current_displacements.items():
                 dist_threshold_list[value-1] = 2 if dist > 100 else 0
             if 1 in dist_threshold_list:
-                messagebox.showinfo("found abnormal", f"found abnormal label {} :apart area")
+                abnormal_label = 0
+                for i in range(len(dist_threshold_list)):
+                    if dist_threshold_list[i] == 1:
+                        abnormal_label = i
+                        break
+                menu = self.label_code_menu["menu"]
+                messagebox.showinfo("found abnormal", f"found abnormal label {self.current_label_dict[str(i+1)]}: apart area")
                 self.abnormal_list.append(idx)
                 self.idx = len(self.abnormal_list) - 1
                 self.video_scroll.set(self.abnormal_list[self.idx])
@@ -1245,7 +1257,12 @@ class DataLabelingApp:
                 found = 1
                 break
             if 2 in dist_threshold_list:
-                messagebox.showinfo("found abnormal", "found abnormal distance")
+                abnormal_label = 0
+                for i in range(len(dist_threshold_list)):
+                    if dist_threshold_list[i] == 2:
+                        abnormal_label = i
+                        break
+                messagebox.showinfo("found abnormal", f"found abnormal label {self.current_label_dict[str(i+1)]}: distance too large")
                 self.abnormal_list.append(idx)
                 self.idx = len(self.abnormal_list) - 1
                 self.video_scroll.set(self.abnormal_list[self.idx])
