@@ -153,7 +153,7 @@ def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame
     # create dir to save result
     #path tag to change posix
     if os_env == 'posix':
-        pass
+        tracking_result_dir = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}'
     elif os_env == 'nt':
         tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
     create_dir(tracking_result_dir)

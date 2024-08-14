@@ -21,13 +21,16 @@ from sklearn.cluster import DBSCAN
 from random import randrange
 from tkinter.simpledialog import askstring
 
+np.random.seed(200)
+_palette = ((np.random.random((3*255)))*255).astype(np.uint8).tolist()
+_palette = [175, 0, 0, 0, 175, 0, 0, 0, 175, 75, 175, 0, 175, 0, 175, 0, 175, 175]+_palette
 
 def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, end_check, end_frame, click_stack, current_label_dict, overwrite, os_env):
     video_name = '.'.join(os.path.basename(video_path).split('.')[:-1])
     #path tag to change posix
-    if self.os_env == 'posix':
-        pass
-    elif self.os_env == 'nt':
+    if os_env == 'posix':
+        tracking_result_dir = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}'
+    elif os_env == 'nt':
         tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
 
     output_masked_json_dir= f'{tracking_result_dir}'
@@ -91,13 +94,13 @@ def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, en
 
         vaild_point_list.append(end_frame)
         #path tag to change posix
-        if self.os_env == 'posix':
+        if os_env == 'posix':
             pass
-        elif self.os_env == 'nt':
+        elif os_env == 'nt':
             with open(f'{tracking_result_dir}/multi_track_execute.bat', 'w') as bat_output:
                 for i in range(len(vaild_point_list)-1):
                     bat_output.write(f'start python multi_tracking.py {video_path} {tracking_result_dir}/tracking_point.json {vaild_point_list[i]} {vaild_point_list[i+1]} {reversed}\n')
-        messagebox.showinfo('Finish', f'Multi track file generated. Please execute "multi_track_execute.bat" on cmd.')
+            messagebox.showinfo('Finish', f'Multi track file generated. Please execute "multi_track_execute.bat" on cmd.')
     else:
         vcap = cv2.VideoCapture(video_path)
         width = int(vcap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -246,22 +249,22 @@ class DataLabelingApp:
 
         # Scroll bar for video navigation
         self.video_scroll = tk.Scale(self.upper_control_frame,width=15, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_video_frame)
-        self.video_scroll.place(relx=0.05, rely=-0.1, relheight=1.1, relwidth=0.18)
+        self.video_scroll.place(relx=0.05, rely=-0.1, relheight=1.1, relwidth=0.24)
         self.master.bind("<Left>", self.prev_frame)
         self.master.bind("<Right>", self.next_frame)
 
         #input for frae
         vcmd = (self.master.register(self.validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         self.entry = tk.Entry(self.upper_control_frame, textvariable=self.current_frame_num, validate = 'key', validatecommand = vcmd)
-        self.entry.place(relx=0.23, relheight=1, relwidth=0.04)
+        self.entry.place(relx=0.29, relheight=1, relwidth=0.04)
 
 
         self.jump_button = tk.Button(self.upper_control_frame, text="Jump to frame", command=self.jump_to_frame)
-        self.jump_button.place(relx=0.27, relheight=1, relwidth=0.06)
+        self.jump_button.place(relx=0.33, relheight=1, relwidth=0.06)
 
-        self.end_check = tk.IntVar()
-        self.c3 = tk.Checkbutton(self.upper_control_frame, text='Ending frame',variable=self.end_check, onvalue=True, offvalue=False)
-        self.c3.place(relx=0.33, relheight=1, relwidth=0.07)
+        #self.end_check = tk.IntVar()
+        #self.c3 = tk.Checkbutton(self.upper_control_frame, text='Ending frame',variable=self.end_check, onvalue=True, offvalue=False)
+        #self.c3.place(relx=0.33, relheight=1, relwidth=0.07)
 
         self.second_label = tk.Label(self.upper_control_frame, text='second:')
         self.second_label.place(relx=0.41, relheight=1, relwidth=0.03)
@@ -313,12 +316,12 @@ class DataLabelingApp:
         self.labels_history = []  # To store the history of label operations
         self.json_data = None  # To store json
         self.label_colors = {
-            1: (175, 0, 0),  # Red
-            2: (0, 175, 0),  # Green
-            3: (0, 0, 175),  # Blue
-            4: (75, 175, 0),  # Yellow
-            5: (175, 0, 175),  # Purple
-            6: (0, 175, 175)   # Cyan
+            1: tuple(_palette[0:3]),  
+            2: tuple(_palette[3:6]),  
+            3: tuple(_palette[6:9]),  
+            4: tuple(_palette[9:12]),  
+            5: tuple(_palette[12:15]),  
+            6: tuple(_palette[15:18])
         }
 
         # Current label code variable
@@ -665,7 +668,8 @@ class DataLabelingApp:
             #WTD: change file path name
             #path tag to change posix
             if self.os_env == 'posix':
-                pass
+                video_name = '.'.join(os.path.basename(self.video_path).split('.')[:-1])
+                save_path = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}'
             elif self.os_env == 'nt':
                 save_path = self.video_path.replace('assets', 'tracking_results').replace('.mp4', '').replace('raw_video/', '')
             save_mask_path = save_path
@@ -738,13 +742,15 @@ class DataLabelingApp:
             #    json.dump(json_dict, f)
             #    print("mask saved.")
     def save_tracking_point(self):
-        #path tag to change posix
+        #save different path for windows and linux
         video_name = '.'.join(os.path.basename(self.video_path).split('.')[:-1])
         if self.os_env == 'posix':
-            pass
+            save_path = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}'
         elif self.os_env == 'nt':
             save_path = os.path.dirname(self.video_path).replace('assets', 'tracking_results')+f'/{video_name}'
         tracking_point_list = []
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
         if os.path.isfile(f'{save_path}/tracking_point_list.json'):
             with open(f'{save_path}/tracking_point_list.json') as json_data:
                 tracking_point_list = json.load(json_data)
@@ -852,13 +858,13 @@ class DataLabelingApp:
 
 
     def load_default_json_data(self):
-        #path tag to change posix
+        #save different path for windows and linux
         if self.video_path is None:
             print("Video is not loading.")
             return
         video_name = '.'.join(os.path.basename(self.video_path).split('.')[:-1])
         if self.os_env == 'posix':
-            pass
+            tracking_result_dir = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}'
         elif self.os_env == 'nt':
             tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
         filepath = f'{tracking_result_dir}/tracking_point.json'
@@ -956,7 +962,8 @@ class DataLabelingApp:
             if 0 <= y < self.current_mask.shape[0] and 0 <= x < self.current_mask.shape[1]:
                 label = self.current_mask[y, x]
                 if label != 0:
-                    self.current_label_code.set(str(label))
+                    menu = self.label_code_menu["menu"]
+                    self.current_label_code.set(self.current_label_dict[label])
 
     def label_change(self, *args):
         #prev_mask = self.Seg_Tracker.first_frame_mask
@@ -1010,9 +1017,9 @@ class DataLabelingApp:
             label_point = []
             tracking_point_json = None
             video_name = '.'.join(os.path.basename(self.video_path).split('.')[:-1])
-            #path tag to change posix
+            #save different path for windows and linux
             if self.os_env == 'posix':
-                pass
+                tracking_result_dir = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}'
             elif self.os_env == 'nt':
                 tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
             filepath = f'{tracking_result_dir}/tracking_point.json'
@@ -1230,7 +1237,7 @@ class DataLabelingApp:
             for value, dist in current_displacements.items():
                 dist_threshold_list[value-1] = 2 if dist > 100 else 0
             if 1 in dist_threshold_list:
-                messagebox.showinfo("found abnormal", "found abnormal apart area")
+                messagebox.showinfo("found abnormal", f"found abnormal label {} :apart area")
                 self.abnormal_list.append(idx)
                 self.idx = len(self.abnormal_list) - 1
                 self.video_scroll.set(self.abnormal_list[self.idx])
