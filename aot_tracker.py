@@ -13,8 +13,8 @@ from skimage.morphology.binary import binary_dilation
 
 
 np.random.seed(200)
-_palette = ((np.random.random((3*255))*0.7+0.3)*255).astype(np.uint8).tolist()
-_palette = [0,0,0]+_palette
+_palette = ((np.random.random((3*249)))*255).astype(np.uint8).tolist()
+_palette = [0, 0, 0, 175, 0, 0, 0, 175, 0, 0, 0, 175, 75, 175, 0, 175, 0, 175, 0, 175, 175]+_palette
 
 import aot.dataloaders.video_transforms as tr
 from aot.utils.checkpoint import load_network
