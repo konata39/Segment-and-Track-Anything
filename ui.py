@@ -374,14 +374,17 @@ class DataLabelingApp:
         self.find_next_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find next abnormal frame", command=self.find_next_abnormal)
         self.find_next_abnormal_button.place(relx=0.15, relheight=1, relwidth=0.15)
 
-        self.find_large_range_button = tk.Button(self.abnormal_control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
-        self.find_large_range_button.place(relx=0.3, relheight=1, relwidth=0.15)
+        #self.find_large_range_button = tk.Button(self.abnormal_control_frame, text="Find next abnormal range frame", command=self.find_and_jump_to_large_range)
+        #self.find_large_range_button.place(relx=0.3, relheight=1, relwidth=0.15)
 
         self.find_all_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find all abnormal frame", command=self.find_all_abnormal)
-        self.find_all_abnormal_button.place(relx=0.45, relheight=1, relwidth=0.15)
+        self.find_all_abnormal_button.place(relx=0.3, relheight=1, relwidth=0.15)
 
         self.save_abnormal_frame_button = tk.Button(self.abnormal_control_frame, text="Save abnormal frame", command=self.output_abnormal_frame)
-        self.save_abnormal_frame_button.place(relx=0.6, relheight=1, relwidth=0.15)
+        self.save_abnormal_frame_button.place(relx=0.45, relheight=1, relwidth=0.15)
+
+        self.generate_video_button = tk.Button(self.abnormal_control_frame, text="Generate Video", command=self.generate_video)
+        self.generate_video_button.place(relx=0.85, relheight=1, relwidth=0.15)
 
         #self.reversed_check = tk.IntVar()
         #self.c2 = tk.Checkbutton(self.control_frame, text='Reversed tracking',variable=self.reversed_check, onvalue=True, offvalue=False)
@@ -799,14 +802,8 @@ class DataLabelingApp:
         return data
 
     def rebuild_mask(self, color_label, color_count, width, height):
-        mask = np.zeros((height, width), dtype=int)
-        current_pos = 0
-        for label, count in zip(color_label, color_count):
-            for _ in range(count):
-                row = current_pos // width
-                col = current_pos % width
-                mask[row, col] = label
-                current_pos += 1
+        result = np.repeat(color_label, color_count)
+        mask = result.reshape(height, width)
         return mask
 
     def load_json_data(self):
@@ -1429,6 +1426,54 @@ class DataLabelingApp:
         json.dump(self.abnormal_list, out_file, indent = 6)
 
         out_file.close()
+
+    def generate_video(self):
+        messagebox.showinfo('Select', "Please Select json data to apply on video.")
+        filepath = filedialog.askopenfilename()
+        if filepath is None:
+            return
+        with open(filepath) as json_data:
+            manual_point_json = json.load(json_data)
+        messagebox.showinfo('Select', "Please Select video.")
+        video_path = filedialog.askopenfilename()
+        if video_path is None:
+            return
+        vcap = cv2.VideoCapture(video_path)
+        length = int(vcap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = vcap.get(cv2.CAP_PROP_FPS)
+        width = int(vcap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(vcap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fourcc =  cv2.VideoWriter_fourcc(*"mp4v")
+        video_name = '.'.join(os.path.basename(video_path).split('.')[:-1])
+        if self.os_env == 'posix':
+            output_path = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}/{video_name}_mask.mp4'
+        elif self.os_env == 'nt':
+            output_path = os.path.dirname(video_path).replace('assets', 'tracking_results')+f'/{video_name}/{video_name}_mask.mp4'
+
+        print(output_path)
+
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        counter = 0
+        while vcap.isOpened():
+            ret, frame  = vcap.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+
+            color_dict = manual_point_json['color_dict'][counter]
+            color_label = color_dict['color_label']
+            color_count = color_dict['color_count']
+
+            mask = self.rebuild_mask(color_label, color_count, width, height)
+            frame = self.apply_mask_to_frame(frame, mask)
+            out.write(frame)
+            print('frame {}/{} writed'.format(counter,length),end='\r')
+            counter += 1
+        out.release()
+        vcap.release()
+        #cv2.imwrite("name.jpg", frame)
+        print("I am NT")
+        print("PASS")
     #for frame_index, mask_data in self.json_data.items():
     #    for _, mask in mask_data['shapes'].items():
     #        area = self.calculate_mask_area(mask)
