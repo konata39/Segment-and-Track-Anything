@@ -1095,14 +1095,17 @@ class DataLabelingApp:
             self.thread_video.start()
 
             #reverse track after normal track
-            if int(self.entry_end.get()) > int(self.current_idx):
+            if int(self.entry_end.get()) > int(self.current_idx) or not by_frame:
                 start_f = 0
                 self.Seg_Tracker_reverse_threading = copy.deepcopy(self.Seg_Tracker)
                 self.video_path_reverse_threading = self.video_path
                 self.video_fps_reverse_threading = self.video_fps
                 self.ab_check_reverse_threading = self.ab_check.get()
                 self.end_check_reverse_threading = by_frame
-                self.current_idx_reverse_threading = int(self.entry_end.get())
+                if by_frame:
+                    self.current_idx_reverse_threading = int(self.entry_end.get())
+                else:
+                    self.current_idx_reverse_threading = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 self.entry_end_reverse_threading = int(self.current_idx)
                 #print(self.current_idx_reverse_threading, self.entry_end_reverse_threading)
                 if label_point == []:

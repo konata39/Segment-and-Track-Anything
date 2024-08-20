@@ -228,7 +228,25 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     first_mask = SegTracker.first_frame_mask
     if reversed:
         print("Reversed mode is on.")
-        pred_list.append(first_mask)
+
+        arr_1d = first_mask.flatten()
+        changes = np.diff(arr_1d) != 0
+        boundary_indices = np.where(changes)[0] + 1
+        boundaries = np.concatenate(([0], boundary_indices, [len(arr_1d)]))
+        values = arr_1d[boundaries[:-1]]
+        repeats = np.diff(boundaries)
+        color_label = values.tolist()
+        color_count = repeats.tolist()
+        label_sum_dict = dict()
+        for i in range(len(color_label)):
+            if color_label[i] == 0:
+                continue
+            if color_label[i] not in label_sum_dict:
+                label_sum_dict[color_label[i]] = color_count[i]
+            else:
+                label_sum_dict[color_label[i]] += color_count[i]
+
+        pred_list.append([color_label, color_count, label_sum_dict])
     with torch.cuda.amp.autocast():
         while cap.isOpened():
             #print("processed frame {}, obj_num {}      Step 1".format(frame_idx, SegTracker.get_obj_num()),end='\r')
@@ -274,22 +292,23 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
             gc.collect()
             if output_image:
                 save_prediction(pred_mask, output_mask_dir, str(frame_idx).zfill(5) + '.png')
-            merged_list = []
-            for i in pred_mask:
-                merged_list.extend(i)
-            g = groupby(merged_list)
-            color_label = []
-            color_count = []
+
+            arr_1d = pred_mask.flatten()
+            changes = np.diff(arr_1d) != 0
+            boundary_indices = np.where(changes)[0] + 1
+            boundaries = np.concatenate(([0], boundary_indices, [len(arr_1d)]))
+            values = arr_1d[boundaries[:-1]]
+            repeats = np.diff(boundaries)
+            color_label = values.tolist()
+            color_count = repeats.tolist()
             label_sum_dict = dict()
-            for key, group in g:
-                now_total = len(list(group))
-                color_label.append(int(key))
-                color_count.append(now_total)
-                if str(key) != '0':
-                    if str(key) not in label_sum_dict:
-                        label_sum_dict[str(key)] = now_total
-                    else:
-                        label_sum_dict[str(key)] += now_total
+            for i in range(len(color_label)):
+                if color_label[i] == 0:
+                    continue
+                if color_label[i] not in label_sum_dict:
+                    label_sum_dict[color_label[i]] = color_count[i]
+                else:
+                    label_sum_dict[color_label[i]] += color_count[i]
 
             pred_list.append([color_label, color_count, label_sum_dict])
             print("processed frame {}, obj_num {}      ".format(frame_idx, SegTracker.get_obj_num()),end='\r')
@@ -327,7 +346,7 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
             #if mask part is separate, break
         cap.release()
         print('\nfinished')
-    ggbb528()
+
     ##################
     # Visualization
     ##################
