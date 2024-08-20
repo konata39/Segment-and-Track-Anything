@@ -274,7 +274,24 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
             gc.collect()
             if output_image:
                 save_prediction(pred_mask, output_mask_dir, str(frame_idx).zfill(5) + '.png')
-            pred_list.append(pred_mask)
+            merged_list = []
+            for i in pred_mask:
+                merged_list.extend(i)
+            g = groupby(merged_list)
+            color_label = []
+            color_count = []
+            label_sum_dict = dict()
+            for key, group in g:
+                now_total = len(list(group))
+                color_label.append(int(key))
+                color_count.append(now_total)
+                if str(key) != '0':
+                    if str(key) not in label_sum_dict:
+                        label_sum_dict[str(key)] = now_total
+                    else:
+                        label_sum_dict[str(key)] += now_total
+
+            pred_list.append([color_label, color_count, label_sum_dict])
             print("processed frame {}, obj_num {}      ".format(frame_idx, SegTracker.get_obj_num()),end='\r')
             if reversed:
                 frame_idx -= 1
@@ -310,7 +327,7 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
             #if mask part is separate, break
         cap.release()
         print('\nfinished')
-
+    ggbb528()
     ##################
     # Visualization
     ##################
@@ -352,8 +369,6 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     print(frame_num)
     #with open(f"{io_args['output_masked_frame_dir']}/{str(frame_idx).zfill(5)}.json", 'w') as f:
     #    json.dump(data, f)
-    color_label = []
-    color_count = []
     json_dict = {}
     color_dict = []
     if reversed:
@@ -394,31 +409,16 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
             print("Warning")
             print(output_frame_idx)
             raise
-        merged_list = []
-        for i in pred_mask:
-            merged_list.extend(i)
 
-
-        g = groupby(merged_list)
-        label_sum_dict = dict()
-        for key, group in g:
-            now_total = len(list(group))
-            color_label.append(int(key))
-            color_count.append(now_total)
-            if str(key) != '0':
-                if str(key) not in label_sum_dict:
-                    label_sum_dict[str(key)] = now_total
-                else:
-                    label_sum_dict[str(key)] += now_total
 
         #print(color_label)
         #print(color_count)
         #color_dict.append({'color_label':color_label, 'color_count':color_count})
         if reversed:
-            color_dict[(frame_num)-output_frame_idx] = {'color_label':color_label, 'color_count':color_count, 'label_sum':label_sum_dict}
+            color_dict[(frame_num)-output_frame_idx] = {'color_label':pred_mask[0], 'color_count':pred_mask[1], 'label_sum':pred_mask[2]}
 
         else:
-            color_dict[output_frame_idx+frame_num] = {'color_label':color_label, 'color_count':color_count, 'label_sum':label_sum_dict}
+            color_dict[output_frame_idx+frame_num] = {'color_label':pred_mask[0], 'color_count':pred_mask[1], 'label_sum':pred_mask[2]}
         #masked_pred_list.append(masked_frame)
         #masked_frame = cv2.cvtColor(masked_frame,cv2.COLOR_RGB2BGR)
         #print(len(pred_mask))
@@ -429,8 +429,9 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
             if not ret:
                 break
             frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-            masked_frame = draw_mask(frame, pred_mask)
             if output_image:
+                #TODO: expend group data to original mask to apply on frame
+                masked_frame = draw_mask(frame, pred_mask)
                 if reversed:
                     cv2.imwrite(f"{io_args['output_masked_frame_dir']}/{str(frame_num-output_frame_idx).zfill(5)}.png", masked_frame[:, :, ::-1])
                 else:
