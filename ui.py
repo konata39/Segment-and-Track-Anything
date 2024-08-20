@@ -533,7 +533,7 @@ class DataLabelingApp:
                 continue
             color = np.array(self.label_colors[label])
             mask_layer = (mask == label)
-            overlay[mask_layer] = np.clip(0.7 * color + 0.3 * frame[mask_layer], 0, 255).astype(np.uint8)
+            overlay[mask_layer] = np.clip(0.4 * color + 0.6 * frame[mask_layer], 0, 255).astype(np.uint8)
         return overlay
 
     def capture_frame(self):
@@ -1188,12 +1188,14 @@ class DataLabelingApp:
         while True:
             #if self.end_check.get():
                 #if reversed == 0 and idx > int(self.entry_end.get()):
+            print('checking frame {}'.format(idx),end='\r')
             if idx > int(self.entry_end.get()):
                 break
                 #elif reversed == 1 and idx < int(self.entry_end.get()):
                 #    break
             if len(self.abnormal_list) > 0:
                 if idx < self.abnormal_list[-1] + 20:
+                    idx = idx+1 if reversed == 0 else idx-1
                     continue
             print("detect frame {}".format(idx),end='\r')
             #check mask frames
@@ -1472,8 +1474,9 @@ class DataLabelingApp:
         out.release()
         vcap.release()
         #cv2.imwrite("name.jpg", frame)
-        print("I am NT")
-        print("PASS")
+        print()
+        print("Finish.")
+        messagebox.showinfo('Finish', "Video process is finished.")
     #for frame_index, mask_data in self.json_data.items():
     #    for _, mask in mask_data['shapes'].items():
     #        area = self.calculate_mask_area(mask)
