@@ -149,6 +149,7 @@ def tracking_objects_in_video(SegTracker, input_video, input_img_seq, fps, frame
         video_name = file_name
 
     else:
+        print("return None")
         return None, None
     # create dir to save result
     #path tag to change posix

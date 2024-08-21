@@ -1095,7 +1095,7 @@ class DataLabelingApp:
             self.thread_video.start()
 
             #reverse track after normal track
-            if int(self.entry_end.get()) > int(self.current_idx) or not by_frame:
+            if int(self.entry_end.get()) > int(self.current_idx):
                 start_f = 0
                 self.Seg_Tracker_reverse_threading = copy.deepcopy(self.Seg_Tracker)
                 self.video_path_reverse_threading = self.video_path
