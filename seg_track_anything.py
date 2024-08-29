@@ -180,10 +180,11 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     pred_list = []
     masked_pred_list = []
 
-
+    
     # source video to segment
     cap = cv2.VideoCapture(input_video)
     fps = cap.get(cv2.CAP_PROP_FPS)
+
     if end_frame == -1:
         end_frame = 0 if reversed else int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if frame_num > 0:

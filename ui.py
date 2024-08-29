@@ -1095,7 +1095,7 @@ class DataLabelingApp:
             self.thread_video.start()
 
             #reverse track after normal track
-            if int(self.entry_end.get()) > int(self.current_idx):
+            if int(self.entry_end.get()) > int(self.current_idx) and by_frame == True:
                 start_f = 0
                 self.Seg_Tracker_reverse_threading = copy.deepcopy(self.Seg_Tracker)
                 self.video_path_reverse_threading = self.video_path
@@ -1143,19 +1143,19 @@ class DataLabelingApp:
                     prev_mask = self.Seg_Tracker_reverse_threading.first_frame_mask
                     self.Seg_Tracker_reverse_threading.update_origin_merged_mask(prev_mask)
                 overwrite = False
-            self.thread_reverse_video = threading.Thread(target=thread_tracking, args=(
-                self.Seg_Tracker_reverse_threading,
-                self.video_path_reverse_threading,
-                self.video_fps_reverse_threading,
-                self.current_idx_reverse_threading,
-                self.ab_check_reverse_threading,
-                self.end_check_reverse_threading,
-                self.entry_end_reverse_threading,
-                self.click_stack,
-                self.current_label_dict,
-                overwrite,
-                self.os_env))
-            self.thread_reverse_video.start()
+                self.thread_reverse_video = threading.Thread(target=thread_tracking, args=(
+                    self.Seg_Tracker_reverse_threading,
+                    self.video_path_reverse_threading,
+                    self.video_fps_reverse_threading,
+                    self.current_idx_reverse_threading,
+                    self.ab_check_reverse_threading,
+                    self.end_check_reverse_threading,
+                    self.entry_end_reverse_threading,
+                    self.click_stack,
+                    self.current_label_dict,
+                    overwrite,
+                    self.os_env))
+                self.thread_reverse_video.start()
 
     def track_labels_all(self):
         self.track_labels(False)
