@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image, ImageTk
 import cv2
 from seg_track_anything import aot_model2ckpt, tracking_objects_in_video, draw_mask
+from tkinter.constants import DISABLED, NORMAL 
 from model_args import segtracker_args,sam_args,aot_args
 from SegTracker import SegTracker
 from tool.transfer_tools import draw_outline, draw_points
@@ -20,6 +21,7 @@ from skimage import measure
 from sklearn.cluster import DBSCAN
 from random import randrange
 from tkinter.simpledialog import askstring
+import glob
 
 np.random.seed(200)
 _palette = ((np.random.random((3*255)))*255).astype(np.uint8).tolist()
@@ -45,7 +47,7 @@ def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, en
             return
         messagebox.showinfo('Finish', f'Tracking success. output file is at \n{output_masked_json_dir}')
     else:
-        result = tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, -1, False, False, detect_check, False, current_label_dict, os_env)
+        result = tracking_objects_in_video(Seg_Tracker, video_path, None, video_fps, iframe, -1, False, False, detect_check, False, False, current_label_dict, os_env)
         if result == None:
             messagebox.showinfo('Finish', "No label mask and manual mask. Exit.")
             return
@@ -186,10 +188,19 @@ class DataLabelingApp:
         self.current_frame_num = tk.IntVar(value=0)
         self.current_second_num = tk.StringVar(value="0")
         self.end_frame = tk.IntVar(value=0)
+        
+        self.display_info_frame = tk.Frame(master)
+        self.display_info_frame.pack(side=tk.TOP, fill=tk.BOTH)
+        
+        self.image_info_label = tk.Label(self.display_info_frame, text=' display zone:', anchor="e", justify=tk.LEFT)
+        self.image_info_label.pack(side="left",anchor="n")
+        
+        self.control_info_label = tk.Label(self.display_info_frame, text='labeling zone:', anchor="e", justify=tk.LEFT)
+        self.control_info_label.place(relx=0.5)
 
         # Frame for video and image display areas
         self.display_frame = tk.Frame(master)
-        self.display_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.display_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=1)
 
         # Parameters for threading
         self.Seg_Tracker_threading = None
@@ -233,6 +244,13 @@ class DataLabelingApp:
         # Frame for controls
         self.control_frame = tk.Frame(master)
         self.control_frame.pack(fill=tk.X, side=tk.TOP, padx=10, pady=5, ipady=30)
+        
+        
+        #variable for image set
+        self.image_set = []
+        
+        self.image_control_frame = tk.Frame(self.control_frame)
+        self.image_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
 
         self.upper_control_frame = tk.Frame(self.control_frame)
         self.upper_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
@@ -242,6 +260,19 @@ class DataLabelingApp:
 
         self.abnormal_control_frame = tk.Frame(self.control_frame)
         self.abnormal_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
+        
+        # Load image set button
+        self.load_images_button = tk.Button(self.image_control_frame, text="Load Image Set", command=self.load_image_set)
+        self.load_images_button.place(relx=0, relheight=1, relwidth=0.1)
+        
+        # Scroll bar for image navigation
+        self.images_scroll = tk.Scale(self.image_control_frame,width=15, from_=0, to=100, orient=tk.HORIZONTAL)#, command=self.update_video_frame)
+        self.images_scroll.place(relx=0.1, rely=-0.1, relheight=1.1, relwidth=0.24)
+        #self.master.bind("<Left>", self.prev_frame)
+        #self.master.bind("<Right>", self.next_frame)
+        
+        self.jump_image_button = tk.Button(self.image_control_frame, text="Jump to image", command=self.jump_to_frame)
+        self.jump_image_button.place(relx=0.34, relheight=1, relwidth=0.06)
 
         # Load video button
         self.load_video_button = tk.Button(self.upper_control_frame, text="Load Video", command=self.load_video)
@@ -440,7 +471,38 @@ class DataLabelingApp:
         }
 
         return prompt
-
+    
+    def load_image_set(self):
+        file_path = filedialog.askdirectory(parent=root, title='Select directories')
+        if file_path:
+            self.image_set = glob.glob(os.path.join(file_path, "*.png"))
+            self.current_label_dict = {"1":"main"}
+            menu = self.label_code_menu["menu"]
+            menu.delete(0, "end")
+            first_element = False
+            for i in self.current_label_dict:
+                label_name = self.current_label_dict[str(i)]
+                menu.add_command(label=label_name, command=tk._setit(self.current_label_code, str(label_name)))
+            self.load_video_button['state'] = DISABLED 
+            self.current_label_code.set(self.current_label_dict["1"])
+            self.current_frame = cv2.imread(self.image_set[0])
+            self.height, self.width= self.current_frame.shape[:2]
+            total_image_len = len(self.image_set)
+            self.images_scroll.set(0)
+            self.images_scroll.config(to=total_image_len - 1)
+            self.Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
+            self.click_stack = [[[],[]]]
+            self.Seg_Tracker.restart_tracker()
+            self.Seg_Tracker.sam.have_embedded = False
+            self.Seg_Tracker.update_origin_merged_mask(None)
+            self.captured_frame = self.current_frame.copy()
+            self.masked_frame = self.current_frame.copy()
+            self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
+            self.display_frame_in_canvas(self.captured_frame, self.video_canvas)
+            #self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
+            #my_text = f"Current frame: {self.video_scroll.get()}\npath:{self.video_path}"
+            #self.info_label.config(text = my_text)
+        
     def load_video(self):
         file_path = filedialog.askopenfilename()
         if file_path:
@@ -1452,6 +1514,7 @@ class DataLabelingApp:
         video_name = '.'.join(os.path.basename(video_path).split('.')[:-1])
         if self.os_env == 'posix':
             output_path = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}/{video_name}_mask.mp4'
+            print("output to:", output_path)
         elif self.os_env == 'nt':
             output_path = os.path.dirname(video_path).replace('assets', 'tracking_results')+f'/{video_name}/{video_name}_mask.mp4'
 
