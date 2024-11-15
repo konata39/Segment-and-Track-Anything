@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image, ImageTk
 import cv2
 from seg_track_anything import aot_model2ckpt, tracking_objects_in_video, draw_mask
-from tkinter.constants import DISABLED, NORMAL 
+from tkinter.constants import DISABLED, NORMAL
 from model_args import segtracker_args,sam_args,aot_args
 from SegTracker import SegTracker
 from tool.transfer_tools import draw_outline, draw_points
@@ -188,13 +188,13 @@ class DataLabelingApp:
         self.current_frame_num = tk.IntVar(value=0)
         self.current_second_num = tk.StringVar(value="0")
         self.end_frame = tk.IntVar(value=0)
-        
+
         self.display_info_frame = tk.Frame(master)
         self.display_info_frame.pack(side=tk.TOP, fill=tk.BOTH)
-        
+
         self.image_info_label = tk.Label(self.display_info_frame, text=' display zone:', anchor="e", justify=tk.LEFT)
         self.image_info_label.pack(side="left",anchor="n")
-        
+
         self.control_info_label = tk.Label(self.display_info_frame, text='labeling zone:', anchor="e", justify=tk.LEFT)
         self.control_info_label.place(relx=0.5)
 
@@ -244,11 +244,12 @@ class DataLabelingApp:
         # Frame for controls
         self.control_frame = tk.Frame(master)
         self.control_frame.pack(fill=tk.X, side=tk.TOP, padx=10, pady=5, ipady=30)
-        
-        
+
+
         #variable for image set
         self.image_set = []
-        
+        self.predict_mask = None
+
         self.image_control_frame = tk.Frame(self.control_frame)
         self.image_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
 
@@ -260,19 +261,28 @@ class DataLabelingApp:
 
         self.abnormal_control_frame = tk.Frame(self.control_frame)
         self.abnormal_control_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, ipady=4)
-        
+
         # Load image set button
         self.load_images_button = tk.Button(self.image_control_frame, text="Load Image Set", command=self.load_image_set)
         self.load_images_button.place(relx=0, relheight=1, relwidth=0.1)
-        
+
         # Scroll bar for image navigation
-        self.images_scroll = tk.Scale(self.image_control_frame,width=15, from_=0, to=100, orient=tk.HORIZONTAL)#, command=self.update_video_frame)
+        self.images_scroll = tk.Scale(self.image_control_frame,width=15, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_image_frame)#, command=self.update_video_frame)
         self.images_scroll.place(relx=0.1, rely=-0.1, relheight=1.1, relwidth=0.24)
         #self.master.bind("<Left>", self.prev_frame)
         #self.master.bind("<Right>", self.next_frame)
-        
-        self.jump_image_button = tk.Button(self.image_control_frame, text="Jump to image", command=self.jump_to_frame)
-        self.jump_image_button.place(relx=0.34, relheight=1, relwidth=0.06)
+
+        self.next_image_button = tk.Button(self.image_control_frame, text="Next image", command=self.next_image)
+        self.next_image_button.place(relx=0.34, relheight=1, relwidth=0.06)
+
+        self.prev_image_button = tk.Button(self.image_control_frame, text="Prev image", command=self.prev_image)
+        self.prev_image_button.place(relx=0.40, relheight=1, relwidth=0.06)
+
+        self.jump_image_button = tk.Button(self.image_control_frame, text="Jump to image", command=self.jump_to_image)
+        self.jump_image_button.place(relx=0.46, relheight=1, relwidth=0.06)
+
+        self.save_mask_button = tk.Button(self.image_control_frame, text="Save mask", command=self.save_image_mask)
+        self.save_mask_button.place(relx=0.52, relheight=1, relwidth=0.06)
 
         # Load video button
         self.load_video_button = tk.Button(self.upper_control_frame, text="Load Video", command=self.load_video)
@@ -456,7 +466,7 @@ class DataLabelingApp:
                                                         )
 
         Seg_Tracker = self.SegTracker_add_first_frame(Seg_Tracker, origin_frame, predicted_mask)
-
+        self.predict_mask = predicted_mask
         return masked_frame
 
     def get_click_prompt(self, click_stack, point):
@@ -471,7 +481,7 @@ class DataLabelingApp:
         }
 
         return prompt
-    
+
     def load_image_set(self):
         file_path = filedialog.askdirectory(parent=root, title='Select directories')
         if file_path:
@@ -483,7 +493,18 @@ class DataLabelingApp:
             for i in self.current_label_dict:
                 label_name = self.current_label_dict[str(i)]
                 menu.add_command(label=label_name, command=tk._setit(self.current_label_code, str(label_name)))
-            self.load_video_button['state'] = DISABLED 
+            #disable video part button
+            self.video_scroll['state'] = DISABLED
+            self.entry['state'] = DISABLED
+            self.jump_button['state'] = DISABLED
+            self.second_label['state'] = DISABLED
+            self.entry_second['state'] = DISABLED
+            self.jump_second_button['state'] = DISABLED
+            self.capture_frame_button['state'] = DISABLED
+            self.track_labels_button['state'] = DISABLED
+            self.track_labels_frame_button['state'] = DISABLED
+            self.entry_end['state'] = DISABLED
+            self.c1['state'] = DISABLED
             self.current_label_code.set(self.current_label_dict["1"])
             self.current_frame = cv2.imread(self.image_set[0])
             self.height, self.width= self.current_frame.shape[:2]
@@ -499,10 +520,72 @@ class DataLabelingApp:
             self.masked_frame = self.current_frame.copy()
             self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
             self.display_frame_in_canvas(self.captured_frame, self.video_canvas)
-            #self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
-            #my_text = f"Current frame: {self.video_scroll.get()}\npath:{self.video_path}"
-            #self.info_label.config(text = my_text)
-        
+            my_text = f"Current frame: {self.image_set[0]}\npath:{self.video_path}"
+            self.info_label.config(text = my_text)
+    def update_image_frame(self, event=None):
+        now_image_index = int(self.images_scroll.get())
+        self.current_frame = cv2.imread(self.image_set[now_image_index])
+        self.display_frame_in_canvas(self.current_frame, self.video_canvas)
+
+    def next_image(self):
+        now_image_index = int(self.images_scroll.get())
+        if now_image_index+1 < len(self.image_set):
+            self.images_scroll.set(now_image_index+1)
+            self.current_frame = cv2.imread(self.image_set[now_image_index+1])
+        self.display_frame_in_canvas(self.current_frame, self.video_canvas)
+
+    def prev_image(self):
+        now_image_index = int(self.images_scroll.get())
+        if now_image_index-1 >= 0:
+            self.images_scroll.set(now_image_index-1)
+            self.current_frame = cv2.imread(self.image_set[now_image_index-1])
+        self.display_frame_in_canvas(self.current_frame, self.video_canvas)
+
+    def jump_to_image(self):
+        if self.current_frame.shape == self.masked_frame.shape and not(np.bitwise_xor(self.current_frame,self.masked_frame).any()):
+            pass
+        else:
+            result = messagebox.askyesno('alert', 'detect mask change. Save it?')
+            if result == True:
+                files = [('PNG image','*.png')]
+                file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG file", "*.png")])
+                if file_path is not None and self.predict_mask is not None:
+                    img_array = np.zeros([self.height, self.width, 3], dtype=np.uint8)
+                    img_array[self.predict_mask != 0] = [0, 0, 255]
+                    img = Image.fromarray(img_array)
+                    img.save(file_path)
+                    messagebox.showinfo('showinfo', 'masker saved.')
+        if self.current_frame is not None:
+            self.labels_history = []
+            self.click_stack = []
+            for i in range(segtracker_args["max_obj_num"]):
+                self.click_stack.append([[],[]])
+            self.Seg_Tracker.restart_tracker()
+            self.Seg_Tracker.sam.have_embedded = False
+            for i in range(segtracker_args["max_obj_num"]):
+                self.Seg_Tracker.reset_origin_merged_mask(None, i)
+            self.Seg_Tracker.update_origin_merged_mask(None)
+            self.captured_frame = self.current_frame.copy()
+            self.masked_frame = self.current_frame.copy()
+            self.display_frame_in_canvas(self.captured_frame, self.image_canvas)
+            my_text = f"Current frame: {self.image_set[0]}\npath:{self.video_path}"
+            self.info_label.config(text = my_text)
+            self.Seg_Tracker.first_frame_mask = None
+    def save_image_mask(self):
+        files = [('PNG image','*.png')]
+        file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG file", "*.png")])
+        if file_path is not None and self.predict_mask is not None:
+            img_array = np.zeros([self.height, self.width, 3], dtype=np.uint8)
+            mydict = self.current_label_dict
+            label_word = self.current_label_code.get()
+            current_label_idx = int(list(mydict.keys())[list(mydict.values()).index(label_word)])
+            color_rgb = [self.label_colors[current_label_idx][2], self.label_colors[current_label_idx][1], self.label_colors[current_label_idx][0]]
+            print(self.label_colors[current_label_idx])
+            img_array[self.predict_mask != 0] = color_rgb
+            img = Image.fromarray(img_array)
+            img.save(file_path)
+            messagebox.showinfo('showinfo', 'masker saved.')
+
     def load_video(self):
         file_path = filedialog.askopenfilename()
         if file_path:
