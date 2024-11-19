@@ -74,9 +74,9 @@ def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, en
             else:
                 label_sum_dict[str(key)] += now_total
 
-    if os.path.isfile(f'{tracking_result_dir}/tracking_point.json'):
+    if os.path.isfile(f'{tracking_result_dir}/manual_mask.json'):
         manual_point_json = None
-        with open(f'{tracking_result_dir}/tracking_point.json') as json_data:
+        with open(f'{tracking_result_dir}/manual_mask.json') as json_data:
             manual_point_json = json.load(json_data)
         vaild_point_list = []
         first_mask = Seg_Tracker.first_frame_mask
@@ -91,7 +91,7 @@ def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, en
             manual_point_json["color_dict"][iframe]["color_label"] = color_label
             manual_point_json["color_dict"][iframe]["color_count"] = color_count
             manual_point_json["color_dict"][iframe]["label_sum"] = label_sum_dict
-            with open(f'{tracking_result_dir}/tracking_point.json', 'w') as f:
+            with open(f'{tracking_result_dir}/manual_mask.json', 'w') as f:
                 json.dump(manual_point_json, f)
 
         vaild_point_list.append(end_frame)
@@ -101,7 +101,7 @@ def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, en
         elif os_env == 'nt':
             with open(f'{tracking_result_dir}/multi_track_execute.bat', 'w') as bat_output:
                 for i in range(len(vaild_point_list)-1):
-                    bat_output.write(f'start python multi_tracking.py {video_path} {tracking_result_dir}/tracking_point.json {vaild_point_list[i]} {vaild_point_list[i+1]} {reversed}\n')
+                    bat_output.write(f'start python multi_tracking.py {video_path} {tracking_result_dir}/manual_mask.json {vaild_point_list[i]} {vaild_point_list[i+1]} {reversed}\n')
             messagebox.showinfo('Finish', f'Multi track file generated. Please execute "multi_track_execute.bat" on cmd.')
     else:
         vcap = cv2.VideoCapture(video_path)
@@ -118,9 +118,9 @@ def thread_tracking(Seg_Tracker, video_path, video_fps, iframe, detect_check, en
         manual_point_json["color_dict"][iframe]["color_label"] = color_label
         manual_point_json["color_dict"][iframe]["color_count"] = color_count
         manual_point_json["color_dict"][iframe]["label_sum"] = label_sum_dict
-        with open(f'{tracking_result_dir}/tracking_point.json', 'w') as f:
+        with open(f'{tracking_result_dir}/manual_mask.json', 'w') as f:
             json.dump(manual_point_json, f)
-        messagebox.showinfo('Finish', f'tracking_point.json does not found, file is created.')
+        messagebox.showinfo('Finish', f'manual_mask.json does not found, file is created.')
         vcap.release()
 
     click_dict = dict()
@@ -278,7 +278,7 @@ class DataLabelingApp:
         self.prev_image_button = tk.Button(self.image_control_frame, text="Prev image", command=self.prev_image)
         self.prev_image_button.place(relx=0.40, relheight=1, relwidth=0.06)
 
-        self.jump_image_button = tk.Button(self.image_control_frame, text="Jump to image", command=self.jump_to_image)
+        self.jump_image_button = tk.Button(self.image_control_frame, text="Capture image", command=self.jump_to_image)
         self.jump_image_button.place(relx=0.46, relheight=1, relwidth=0.06)
 
         self.save_mask_button = tk.Button(self.image_control_frame, text="Save mask", command=self.save_image_mask)
@@ -294,7 +294,7 @@ class DataLabelingApp:
         self.master.bind("<Left>", self.prev_frame)
         self.master.bind("<Right>", self.next_frame)
 
-        #input for frae
+        #input for frame
         vcmd = (self.master.register(self.validate),'%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         self.entry = tk.Entry(self.upper_control_frame, textvariable=self.current_frame_num, validate = 'key', validatecommand = vcmd)
         self.entry.place(relx=0.29, relheight=1, relwidth=0.04)
@@ -405,8 +405,8 @@ class DataLabelingApp:
         self.save_manual_mask_button = tk.Button(self.lower_control_frame, text="Save manual mask", command=self.save_manual_mask)
         self.save_manual_mask_button.place(relx=0.51, relheight=1, relwidth=0.08)
 
-        # Save tracking point
-        self.save_tracking_point_button = tk.Button(self.lower_control_frame, text="Save tracking point", command=self.save_tracking_point)
+        # Save manual mask locate
+        self.save_tracking_point_button = tk.Button(self.lower_control_frame, text="Save manual mask locate", command=self.save_tracking_point)
         self.save_tracking_point_button.place(relx=0.59, relheight=1, relwidth=0.1)
 
         self.find_previous_abnormal_button = tk.Button(self.abnormal_control_frame, text="Find previous abnormal frame", command=self.find_previous_abnormal)
@@ -505,6 +505,12 @@ class DataLabelingApp:
             self.track_labels_frame_button['state'] = DISABLED
             self.entry_end['state'] = DISABLED
             self.c1['state'] = DISABLED
+
+            self.next_image_button['state'] = NORMAL
+            self.prev_image_button['state'] = NORMAL
+            self.jump_image_button['state'] = NORMAL
+            self.save_mask_button['state'] = NORMAL
+
             self.current_label_code.set(self.current_label_dict["1"])
             self.current_frame = cv2.imread(self.image_set[0])
             self.height, self.width= self.current_frame.shape[:2]
@@ -590,6 +596,23 @@ class DataLabelingApp:
         file_path = filedialog.askopenfilename()
         if file_path:
             #== TODO: load default word dict if word not in json, else load word dict in json
+            self.video_scroll['state'] = NORMAL
+            self.entry['state'] = NORMAL
+            self.jump_button['state'] = NORMAL
+            self.second_label['state'] = NORMAL
+            self.entry_second['state'] = NORMAL
+            self.jump_second_button['state'] = NORMAL
+            self.capture_frame_button['state'] = NORMAL
+            self.track_labels_button['state'] = NORMAL
+            self.track_labels_frame_button['state'] = NORMAL
+            self.entry_end['state'] = NORMAL
+            self.c1['state'] = NORMAL
+
+            self.next_image_button['state'] = DISABLED
+            self.prev_image_button['state'] = DISABLED
+            self.jump_image_button['state'] = DISABLED
+            self.save_mask_button['state'] = DISABLED
+
             self.current_label_dict = self.DEFAULT_LABEL_DICT
             menu = self.label_code_menu["menu"]
             #print(menu)
@@ -857,7 +880,7 @@ class DataLabelingApp:
                         label_sum_dict[str(key)] = now_total
                     else:
                         label_sum_dict[str(key)] += now_total
-            if not os.path.isfile(f'{save_path}/tracking_point.json'):
+            if not os.path.isfile(f'{save_path}/manual_mask.json'):
                 data_dict["width"] = self.width
                 data_dict["height"] = self.height
                 data_dict["object_num"] = self.Seg_Tracker.get_obj_num()
@@ -866,7 +889,7 @@ class DataLabelingApp:
                 for i in range(int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))):
                     data_dict["color_dict"].append({"color_label": [0], "color_count": [self.width*self.height], "label_sum": {}})
             else:
-                with open(f'{save_path}/tracking_point.json') as json_data:
+                with open(f'{save_path}/manual_mask.json') as json_data:
                     data_dict = json.load(json_data)
             if self.Seg_Tracker.get_obj_num() > data_dict["object_num"]:
                 data_dict["object_num"] = self.Seg_Tracker.get_obj_num()
@@ -874,7 +897,7 @@ class DataLabelingApp:
             data_dict["color_dict"][self.current_idx]["color_label"] = color_label
             data_dict["color_dict"][self.current_idx]["color_count"] = color_count
             data_dict["color_dict"][self.current_idx]["label_sum"] = label_sum_dict
-            with open(f'{save_path}/tracking_point.json', 'w') as f:
+            with open(f'{save_path}/manual_mask.json', 'w') as f:
                 json.dump(data_dict, f)
             click_dict = dict()
             if os.path.isfile(f'{save_path}/click_prompt.json'):
@@ -899,8 +922,8 @@ class DataLabelingApp:
         tracking_point_list = []
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-        if os.path.isfile(f'{save_path}/tracking_point_list.json'):
-            with open(f'{save_path}/tracking_point_list.json') as json_data:
+        if os.path.isfile(f'{save_path}/manual_mask_locate.json'):
+            with open(f'{save_path}/manual_mask_locate.json') as json_data:
                 tracking_point_list = json.load(json_data)
         if int(self.current_idx) not in tracking_point_list:
             tracking_point_list.append(self.current_idx)
@@ -913,9 +936,9 @@ class DataLabelingApp:
             if int(i) > tracking_point_list[0] and int(i) < tracking_point_list[-1] and int(i) not in tracking_point_list:
                 tracking_point_list.insert(1, int(i))
         tracking_point_list = sorted(tracking_point_list)
-        with open(f'{save_path}/tracking_point_list.json', 'w') as f:
+        with open(f'{save_path}/manual_mask_locate.json', 'w') as f:
             json.dump(tracking_point_list, f)
-        messagebox.showinfo('Finish', f'Tracking point json generated. \nPlease execute "generate_auto_tracking_file.py" to generate execute tracking file.')
+        messagebox.showinfo('Finish', f'manual mask locate json generated. \nPlease execute "generate_auto_tracking_file.py" to generate execute tracking file.')
 
     def display_frame_in_canvas(self, frame, canvas):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -1009,7 +1032,7 @@ class DataLabelingApp:
             tracking_result_dir = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}'
         elif self.os_env == 'nt':
             tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
-        filepath = f'{tracking_result_dir}/tracking_point.json'
+        filepath = f'{tracking_result_dir}/manual_mask.json'
         if filepath:
             with open(filepath, 'r') as file:
                 self.json_data = json.load(file)
@@ -1164,14 +1187,14 @@ class DataLabelingApp:
                 tracking_result_dir = "/".join(os.getcwd().split("/")[:-1])+f'/output/{video_name}'
             elif self.os_env == 'nt':
                 tracking_result_dir = f'{os.path.join(os.path.dirname(__file__), "tracking_results", f"{video_name}")}'
-            filepath = f'{tracking_result_dir}/tracking_point.json'
-            if os.path.isfile(f'{tracking_result_dir}/tracking_point.json'):
-                with open(f'{tracking_result_dir}/tracking_point.json') as json_data:
+            filepath = f'{tracking_result_dir}/manual_mask.json'
+            if os.path.isfile(f'{tracking_result_dir}/manual_mask.json'):
+                with open(f'{tracking_result_dir}/manual_mask.json') as json_data:
                     tracking_point_json = json.load(json_data)
                 for idx, i in enumerate(tracking_point_json["color_dict"]):
                     if len(i['color_label']) != 1:
                         label_point.append(idx)
-            #if Seg_Tracker.first_frame_mask is None, try to load tracking_point.json
+            #if Seg_Tracker.first_frame_mask is None, try to load manual_mask.json
             if self.Seg_Tracker_threading.first_frame_mask is None:
                 Seg_Tracker = SegTracker(segtracker_args, sam_args, aot_args)
 

@@ -180,7 +180,7 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
     pred_list = []
     masked_pred_list = []
 
-    
+
     # source video to segment
     cap = cv2.VideoCapture(input_video)
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -214,9 +214,9 @@ def video_type_input_tracking(SegTracker, input_video, io_args, video_name, fram
         create_dir(io_args['output_masked_json_dir'])
     tracking_point_json = None
     label_point = []
-    print(f'{io_args["output_masked_frame_dir"]}/tracking_point.json')
-    if os.path.isfile(f'{io_args["output_masked_frame_dir"]}/tracking_point.json'):
-        with open(f'{io_args["output_masked_frame_dir"]}/tracking_point.json') as json_data:
+    print(f'{io_args["output_masked_frame_dir"]}/manual_mask.json')
+    if os.path.isfile(f'{io_args["output_masked_frame_dir"]}/manual_mask.json'):
+        with open(f'{io_args["output_masked_frame_dir"]}/manual_mask.json') as json_data:
             tracking_point_json = json.load(json_data)
         for idx, i in enumerate(tracking_point_json["color_dict"]):
             if len(i['color_label']) != 1:
